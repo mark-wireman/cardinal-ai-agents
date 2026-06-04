@@ -1,0 +1,236 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // ── Setup tasks ─────────────────────────────────────────────────────────
+    {
+      "label": "🚀 Full Setup (1-Click Deploy)",
+      "detail": "Install all dependencies, build all components, install the VS Code extension",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Install: Node dependencies (root)",
+        "Install: Node dependencies (RAG server)",
+        "Install: Node dependencies (Agent UI)",
+        "Install: Python dependencies",
+        "Build: RAG server (TypeScript)",
+        "Build: Agent UI extension",
+        "Install: Agent Studio extension"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Install: Node dependencies (root)",
+      "type": "shell",
+      "command": "npm install",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Install: Node dependencies (RAG server)",
+      "type": "shell",
+      "command": "npm install",
+      "options": { "cwd": "${workspaceFolder}/vs-code-local-rag/copilot-rag-mcp" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Install: Node dependencies (Agent UI)",
+      "type": "shell",
+      "command": "npm install",
+      "options": { "cwd": "${workspaceFolder}/vs-code-local-agent-ui" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Install: Python dependencies",
+      "type": "shell",
+      "command": "pip install -r reverse_engineering/requirements.txt",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build: RAG server (TypeScript)",
+      "type": "shell",
+      "command": "npm run build",
+      "options": { "cwd": "${workspaceFolder}/vs-code-local-rag/copilot-rag-mcp" },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Build: Agent UI extension",
+      "type": "shell",
+      "command": "npm run compile",
+      "options": { "cwd": "${workspaceFolder}/vs-code-local-agent-ui" },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Install: Agent Studio extension",
+      "type": "shell",
+      "command": "code --install-extension vs-code-local-agent-ui/vs-code-local-agent-ui-0.0.1.vsix --force",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build: Deep RL Agent (C++)",
+      "detail": "Compile the C++ DQN agent binary (requires cmake + C++17 compiler)",
+      "type": "shell",
+      "command": "cmake --build . --config Release",
+      "options": { "cwd": "${workspaceFolder}/deep-rl-cpp-master/build" },
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Package: Agent Studio VSIX",
+      "detail": "Rebuild the .vsix extension package for distribution",
+      "type": "shell",
+      "command": "npx @vscode/vsce package --no-dependencies",
+      "options": { "cwd": "${workspaceFolder}/vs-code-local-agent-ui" },
+      "problemMatcher": []
+    },
+
+    // ── Service tasks (long-running) ────────────────────────────────────────
+    {
+      "label": "▶ Start: MCP Server",
+      "type": "shell",
+      "command": "node mcp-server.js",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^Deep RL Agent|^Gemini-Apigee|^Warning:",
+          "endsPattern": "^(Gemini-Apigee MCP server running|RAG tools enabled)"
+        }
+      },
+      "presentation": {
+        "group": "services",
+        "reveal": "silent",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "▶ Start: Ollama",
+      "type": "shell",
+      "command": "ollama serve",
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Listening on"
+        }
+      },
+      "presentation": {
+        "group": "services",
+        "reveal": "silent",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "▶ Start: ChromaDB",
+      "type": "shell",
+      "command": "chroma run --path ./chroma_data --port 8000",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Application startup complete"
+        }
+      },
+      "presentation": {
+        "group": "services",
+        "reveal": "silent",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "▶ Start: Knowledge Graph Visualizer",
+      "type": "shell",
+      "command": "python visualizer.py --graph ./kg_output/knowledge_graph.json --port 5000",
+      "options": { "cwd": "${workspaceFolder}/reverse_engineering" },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Running on"
+        }
+      },
+      "presentation": {
+        "group": "services",
+        "reveal": "silent",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "▶ Start All Core Services",
+      "detail": "Start Ollama → ChromaDB → MCP Server in sequence",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "▶ Start: Ollama",
+        "▶ Start: ChromaDB",
+        "▶ Start: MCP Server"
+      ],
+      "problemMatcher": []
+    },
+
+    // ── One-shot tasks ──────────────────────────────────────────────────────
+    {
+      "label": "📇 Index: Build RAG Index",
+      "detail": "Embed the current workspace into the vector store for semantic search",
+      "type": "shell",
+      "command": "npm run index",
+      "options": {
+        "cwd": "${workspaceFolder}/vs-code-local-rag/copilot-rag-mcp",
+        "env": {
+          "REPO_ROOT": "${workspaceFolder}",
+          "OLLAMA_BASE_URL": "http://localhost:11434",
+          "EMBED_MODEL": "nomic-embed-text",
+          "CHROMA_URL": "http://localhost:8000",
+          "COLLECTION": "codebase"
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "📇 Index: Rebuild RAG Index (force)",
+      "type": "shell",
+      "command": "npm run reindex",
+      "options": {
+        "cwd": "${workspaceFolder}/vs-code-local-rag/copilot-rag-mcp",
+        "env": {
+          "REPO_ROOT": "${workspaceFolder}",
+          "OLLAMA_BASE_URL": "http://localhost:11434",
+          "EMBED_MODEL": "nomic-embed-text",
+          "CHROMA_URL": "http://localhost:8000",
+          "COLLECTION": "codebase"
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔍 Analyze: Reverse Engineer Project",
+      "detail": "Run the reverse engineering agent against the current workspace",
+      "type": "shell",
+      "command": "python agent.py --root ${workspaceFolder} --output ./kg_output --format all",
+      "options": { "cwd": "${workspaceFolder}/reverse_engineering" },
+      "problemMatcher": []
+    },
+    {
+      "label": "🦙 Ollama: Pull Embedding Model",
+      "type": "shell",
+      "command": "ollama pull nomic-embed-text",
+      "problemMatcher": []
+    },
+    {
+      "label": "🔎 Validate: Check Prerequisites",
+      "detail": "Verify all required tools are installed",
+      "type": "shell",
+      "command": "Write-Host '=== Prerequisites Check ===' -ForegroundColor Cyan; Write-Host ''; $ok=$true; try { $nv = node --version; Write-Host \"Node.js: $nv\" -ForegroundColor Green } catch { Write-Host 'Node.js: NOT FOUND' -ForegroundColor Red; $ok=$false }; try { $pv = python --version 2>&1; Write-Host \"Python: $pv\" -ForegroundColor Green } catch { Write-Host 'Python: NOT FOUND' -ForegroundColor Yellow }; try { $cv = cmake --version | Select-Object -First 1; Write-Host \"CMake: $cv\" -ForegroundColor Green } catch { Write-Host 'CMake: NOT FOUND (optional for Deep RL)' -ForegroundColor Yellow }; if (Test-Path '.env') { Write-Host '.env file: Found' -ForegroundColor Green } else { Write-Host '.env file: MISSING — copy .env.example to .env' -ForegroundColor Red; $ok=$false }; if (Test-Path 'node_modules') { Write-Host 'node_modules: Installed' -ForegroundColor Green } else { Write-Host 'node_modules: MISSING — run npm install' -ForegroundColor Red; $ok=$false }; if (Test-Path 'deep-rl-cpp-master/build/deep_rl_agent*') { Write-Host 'deep_rl_agent binary: Found' -ForegroundColor Green } else { Write-Host 'deep_rl_agent binary: NOT BUILT (optional)' -ForegroundColor Yellow }; if (Test-Path 'vs-code-local-rag/copilot-rag-mcp/dist/server.js') { Write-Host 'RAG server: Built' -ForegroundColor Green } else { Write-Host 'RAG server: NOT BUILT — run Build: RAG server task' -ForegroundColor Yellow }; Write-Host ''; if ($ok) { Write-Host 'Ready to go!' -ForegroundColor Green } else { Write-Host 'Fix the RED items above before starting services.' -ForegroundColor Red }",
+      "problemMatcher": []
+    }
+  ]
+}

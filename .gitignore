@@ -16,8 +16,12 @@ deep-rl-cpp-master/build/
 *.a
 *.lib
 
-# IDE and editor files
-.vscode/
+# IDE and editor files — keep shared VS Code configs, ignore user-specific
+.vscode/*
+!.vscode/tasks.json
+!.vscode/extensions.json
+!.vscode/mcp.json
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo

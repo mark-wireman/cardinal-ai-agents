@@ -1,0 +1,23 @@
+{
+  // VS Code MCP server configuration for agents-deployment-package.
+  // This file wires the consolidated MCP server into Copilot agent mode.
+  // The server exposes: ask_gemini, deep_rl_agent, search_code, get_context,
+  // list_indexed_files, and reindex tools.
+  "servers": {
+    "agents-deployment": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/mcp-server.js"],
+      "env": {
+        "REPO_ROOT": "${workspaceFolder}",
+        "OLLAMA_BASE_URL": "http://localhost:11434",
+        "EMBED_MODEL": "nomic-embed-text",
+        "CHROMA_URL": "http://localhost:8000",
+        "COLLECTION": "codebase",
+        "DEFAULT_TOP_K": "8",
+        "DEFAULT_TOKEN_BUDGET": "2200"
+      }
+    }
+  },
+  "inputs": []
+}

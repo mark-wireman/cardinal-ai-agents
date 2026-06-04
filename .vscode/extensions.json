@@ -1,0 +1,22 @@
+{
+  // VS Code recommended extensions for agents-deployment-package
+  "recommendations": [
+    // The Local Agent Studio extension (built from vs-code-local-agent-ui/)
+    // Install with:  code --install-extension vs-code-local-agent-ui/vs-code-local-agent-ui-0.0.1.vsix
+    "wiremm.vs-code-local-agent-ui",
+
+    // GitHub Copilot (required for agent chat participant and LLM calls)
+    "github.copilot",
+    "github.copilot-chat",
+
+    // C/C++ and CMake (for building deep_rl_agent)
+    "ms-vscode.cpptools",
+    "ms-vscode.cmake-tools",
+
+    // Python (for reverse engineering agent and transcription)
+    "ms-python.python",
+
+    // MCP inspector / debugging
+    "anthropics.claude-dev"
+  ]
+}

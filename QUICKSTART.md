@@ -1,61 +1,115 @@
-# Quick Start: Deep RL Multi-Agent Code Generator
+﻿# Quick Start: Agents Deployment Package
 
-## Prerequisites Check
-```bash
-# 1. Verify Node.js
-node --version  # Should be v18+
+## 1-Click Deploy (Recommended)
 
-# 2. Verify C++ build tools
-cmake --version  # Should be 3.16+
-g++ --version    # Or clang/MSVC
+```powershell
+# Clone the repo and open in VS Code
+git clone <repo-url> agents-deployment-package
+cd agents-deployment-package
+code .
 
-# 3. Verify deep_rl_agent binary exists
-ls deep-rl-cpp-master/build/deep_rl_agent  # Should exist
+# Run the deployment script (installs everything)
+.\deploy.ps1
 ```
 
-## Setup (First Time)
+The script will:
+- Check prerequisites (Node.js 18+, Python, CMake)
+- Create `.env` from `.env.example` (edit with your credentials)
+- Install all Node.js dependencies (root, RAG server, Agent UI)
+- Build the RAG server and Agent Studio extension
+- Install Python packages for reverse engineering
+- Build the Deep RL C++ agent (if CMake is available)
+- Install the Local Agent Studio VS Code extension
 
-### 1. Install Node Dependencies
+### After deploy.ps1 finishes
+
+1. **Edit `.env`** with your Apigee/Gemini credentials
+2. **Reload VS Code** (Ctrl+Shift+P -> "Reload Window")
+3. **Start services** - pick one method:
+   - **Task Runner:** Ctrl+Shift+P -> "Tasks: Run Task" -> "Start All Core Services"
+   - **Agent Studio:** Ctrl+Shift+P -> "Local Agent Studio: Open Studio" -> expand Services panel
+   - **Command Palette:** "Local Agent Studio: Start a Service"
+
+### Optional flags
+
+```powershell
+.\deploy.ps1 -SkipPython     # Skip Python/reverse engineering setup
+.\deploy.ps1 -SkipDeepRL     # Skip C++ agent build
+.\deploy.ps1 -SkipExtension  # Skip VS Code extension install (CI)
+.\deploy.ps1 -Force          # Reinstall everything
+```
+
+---
+
+## Manual Setup (Alternative)
+
+### Prerequisites Check
 ```bash
+node --version    # Should be v18+
+cmake --version   # Should be 3.16+ (optional)
+python --version  # Should be 3.10+ (optional)
+```
+
+### Step-by-Step
+
+```bash
+# 1. Install Node dependencies
 npm install
+
+# 2. Create environment file
+cp .env.example .env
+# Edit .env with your credentials
+
+# 3. Build the RAG server
+cd vs-code-local-rag/copilot-rag-mcp && npm install && npm run build && cd ../..
+
+# 4. Build & install the Agent Studio extension
+cd vs-code-local-agent-ui && npm install && npm run compile
+code --install-extension vs-code-local-agent-ui-0.0.1.vsix --force
+cd ..
+
+# 5. (Optional) Install Python dependencies
+pip install -r reverse_engineering/requirements.txt
+
+# 6. (Optional) Build Deep RL Agent
+cd deep-rl-cpp-master/build && cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build . --config Release && cd ../..
 ```
 
-### 2. Build Deep RL Agent Binary
-```bash
-# Option A: Use npm script
-npm run build-deep-rl
+---
 
-# Option B: Manual build
-cd deep-rl-cpp-master/build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4  # Or: cmake --build . --config Release on Windows
-cd ../..
-```
+## VS Code Tasks
 
-### 3. Configure Environment Variables
-Create/verify `.env` file with:
-```env
-APIGEE_ENDPOINT=https://your-apigee-endpoint/oauth/token
-APIGEE_KEY=your-apigee-key
-APIGEE_SECRET=your-apigee-secret
-GEMINI_ENDPOINT=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent
-```
+All operations are available as VS Code tasks (Ctrl+Shift+P -> "Tasks: Run Task"):
 
-## Running the MCP Server
+| Task | What it does |
+|------|-------------|
+| Full Setup (1-Click Deploy) | Runs all install/build steps in sequence |
+| Start All Core Services | Starts Ollama, ChromaDB, MCP Server |
+| Start: MCP Server | Just the MCP server |
+| Start: Ollama | Local LLM server for embeddings |
+| Start: ChromaDB | Vector database for RAG |
+| Start: Knowledge Graph Visualizer | Flask UI for reverse engineering output |
+| Index: Build RAG Index | Embed workspace into vector store |
+| Analyze: Reverse Engineer Project | Generate knowledge graph from codebase |
+| Validate: Check Prerequisites | Verify all tools are installed |
 
-```bash
-node mcp-server.js
-```
+---
 
-Expected output:
-```
-Deep RL Agent binary found at: .../deep_rl_agent
-Gemini-Apigee MCP server running
-```
+## MCP Server Tools
 
-## Using the Deep RL Agent
+Once running, the MCP server exposes these tools to Copilot agent mode:
 
-### Via MCP Tool Call (Story-Only Analysis)
+| Tool | Purpose |
+|------|---------|
+| `ask_gemini` | Send prompts to Gemini via Apigee |
+| `deep_rl_agent` | DQN-based code analysis and generation |
+| `search_code` | Semantic search over indexed codebase |
+| `get_context` | Token-budgeted context retrieval (RAG) |
+| `list_indexed_files` | Show what is in the vector store |
+| `reindex` | Refresh the codebase index |
+
+### Deep RL Agent Usage
+
 ```json
 {
   "name": "deep_rl_agent",
@@ -67,7 +121,7 @@ Gemini-Apigee MCP server running
 }
 ```
 
-### Via MCP Tool Call (Code Analysis + Generation with Gemini/Apigee)
+Code analysis mode:
 ```json
 {
   "name": "deep_rl_agent",
@@ -80,83 +134,43 @@ Gemini-Apigee MCP server running
 }
 ```
 
-### Other Code Providers
-- `code_provider: "anthropic"` + `api_key`
-- `code_provider: "ollama"` + `ollama_base_url` (+ optional `ollama_model`)
-- `code_provider: "generic"` + `endpoint_url` (+ optional `token`)
+Other code providers: `anthropic` (+ `api_key`), `ollama` (+ `ollama_base_url`), `generic` (+ `endpoint_url`).
 
-`deep_rl_code_agent` remains supported as a backward-compatible alias.
+---
 
-### What Happens
-1. ✅ MCP server validates `analysis_type`
-2. ✅ Spawns deep_rl_agent binary in mode-aware argument format
-3. ✅ In `user_story` mode: returns story quality/alignment analysis
-4. ✅ In `code` mode: analyzes codebase, trains DQN, and calls selected LLM provider
-5. ✅ Returns mode-specific formatted output
+## Agent Studio
 
-### Response Format
-```
-=== Deep RL Multi-Agent Analysis ===
+The Local Agent Studio extension provides a UI for:
+- **Selecting agents** from `.github/agents/`, the deployment package, or user profile
+- **Running agent prompts** with automatic RAG context grounding
+- **Starting/stopping services** directly from the Services panel
+- **Exporting run reports** as Markdown or JSON
 
-Analysis: Files: 47, Pattern: MVC
+Open it: Ctrl+Shift+P -> "Local Agent Studio: Open Studio"
 
---- Generated Prompt ---
-[Contextual prompt with detected libraries]
-
---- Generated Code ---
-[Architecture-conforming implementation]
-
---- User Story Analysis ---
-story[hash] -> score: 0.85
-
---- Code Analysis ---
-Language: C++, Pattern: MVC, Files: 47
-```
-
-Story-only response format:
-```
-=== Deep RL User Story Analysis ===
-
-Mode: user_story
-Requirement context: provided
-
---- Story Analysis ---
-[Role/Goal/Benefit checks, scores, feedback]
-```
+---
 
 ## Troubleshooting
 
 ### Binary Not Found
 ```bash
-# Check if binary exists
 ls -la deep-rl-cpp-master/build/deep_rl_agent
-
-# If missing, rebuild:
-npm run build-deep-rl
+npm run build-deep-rl  # Rebuild if missing
 ```
 
+### Apigee Authentication Failed
+- Verify `.env` has correct `APIGEE_ENDPOINT`, `APIGEE_KEY`, `APIGEE_SECRET`
+
 ### Timeout Error
-- Binary execution times out after 5 minutes
-- Check codebase size (large projects take longer)
+- Binary times out after 5 minutes for large codebases
 - Verify Gemini endpoint is accessible
 
-### Apigee Authentication Failed
-- Verify `.env` file has correct credentials
-- Check APIGEE_ENDPOINT, APIGEE_KEY, APIGEE_SECRET
-- Test token generation: see mcp-server.js `getApigeeToken()`
-
-### Gemini API Error
-- Verify GEMINI_ENDPOINT is correct
-- Check token has Gemini API access
-- Review deep_rl_agent stderr output
-
-## Architecture Validation
-
-See [VALIDATION.md](VALIDATION.md) for complete validation details and compliance with documented multi-agent architecture (per deep-rl-cpp-master/HOWTO.md and README.md).
+### Validate Prerequisites
+- Run task: "Validate: Check Prerequisites"
 
 ## Additional Resources
 
+- **Architecture validation**: [VALIDATION.md](VALIDATION.md)
+- **Team deployment strategy**: [DEPLOYMENT.md](DEPLOYMENT.md)
 - **Multi-agent details**: `deep-rl-cpp-master/HOWTO.md`
 - **DQN architecture**: `deep-rl-cpp-master/README.md`
-- **Validation report**: `VALIDATION.md`
-- **MCP server code**: `mcp-server.js` (lines 1-235)

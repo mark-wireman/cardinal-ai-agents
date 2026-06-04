@@ -1,0 +1,10 @@
+{
+    "jira-plugin.workingProject": "",
+    "cmake.sourceDirectory": "${workspaceFolder}/deep-rl-cpp-master",
+
+    // Copilot: use instruction files for RAG-aware prompting
+    "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+
+    // Python: use the local venv if present
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe"
+}

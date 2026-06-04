@@ -20,6 +20,8 @@ export interface ServiceDefinition {
   icon: string;
   /** Category for UI grouping */
   category: 'core' | 'rag' | 'analysis' | 'utility';
+  /** Environment variables to pass to the service process */
+  env?: Record<string, string>;
   /** Environment variables hint (not secrets — just names) */
   envHint?: string[];
   /** Prerequisites description */
@@ -81,6 +83,13 @@ function buildServiceDefinitions(): ServiceDefinition[] {
       longRunning: false,
       icon: '📇',
       category: 'rag',
+      env: {
+        REPO_ROOT: '{{ROOT}}',
+        OLLAMA_BASE_URL: 'http://localhost:11434',
+        EMBED_MODEL: 'nomic-embed-text',
+        CHROMA_URL: 'http://localhost:8000',
+        COLLECTION: 'codebase',
+      },
       prerequisites: 'Ollama + ChromaDB running, npm install',
     },
     {
@@ -238,9 +247,18 @@ export class ServiceManager {
       try { state.terminal.dispose(); } catch { /* ignore */ }
     }
 
+    // Resolve env vars — replace {{ROOT}} with deployment root
+    const terminalEnv: Record<string, string> = {};
+    if (state.definition.env) {
+      for (const [k, v] of Object.entries(state.definition.env)) {
+        terminalEnv[k] = v.replace('{{ROOT}}', root);
+      }
+    }
+
     const terminal = vscode.window.createTerminal({
       name: terminalName,
       cwd,
+      env: Object.keys(terminalEnv).length > 0 ? terminalEnv : undefined,
       iconPath: new vscode.ThemeIcon(
         state.definition.longRunning ? 'server-process' : 'terminal'
       ),
