@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# VS Code testing artifacts
+.vscode-test/
+
+# Optional local env files
+.env
+.env.*

@@ -1,0 +1,122 @@
+{
+  "name": "vs-code-local-agent-ui",
+  "displayName": "Local Agent Studio",
+  "description": "Workbench for authoring, selecting, and running local Copilot agents against your workspace.",
+  "version": "0.0.1",
+  "publisher": "wiremm",
+  "private": true,
+  "engines": {
+    "vscode": "^1.98.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:copilot-reviewer.selectAgent",
+    "onCommand:copilot-reviewer.openPanel",
+    "onCommand:copilot-reviewer.reviewActiveFile"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "copilot-reviewer.selectAgent",
+        "title": "Local Agent Studio: Select Agent"
+      },
+      {
+        "command": "copilot-reviewer.openPanel",
+        "title": "Local Agent Studio: Open Studio",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "copilot-reviewer.reviewActiveFile",
+        "title": "Local Agent Studio: Run Active File"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "copilot-reviewer",
+          "title": "Agent Studio",
+          "icon": "$(code-review)"
+        }
+      ]
+    },
+    "views": {
+      "copilot-reviewer": [
+        {
+          "id": "copilot-reviewer.home",
+          "name": "Local Agent Studio",
+          "icon": "$(code-review)"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "copilot-reviewer.home",
+        "contents": "Run local Copilot agents from `.github/agents/`, `.claude/agents/`, or your user profile against the workspace.\n\n[Open Studio](command:copilot-reviewer.openPanel)\n[Select Agent](command:copilot-reviewer.selectAgent)\n[Run on Active File](command:copilot-reviewer.reviewActiveFile)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "copilot-reviewer.openPanel",
+          "group": "navigation@99",
+          "when": "resourceLangId =~ /.+/"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "copilot-reviewer.openPanel",
+          "when": "view == copilot-reviewer.home",
+          "group": "navigation"
+        }
+      ]
+    },
+    "chatParticipants": [
+      {
+        "id": "copilot-reviewer.agent",
+        "name": "reviewer",
+        "fullName": "Local Agent Studio",
+        "description": "Run selectable local workspace agents — review, explain, refactor, generate tests, and more.",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "review",
+            "description": "Review the active file or selection"
+          },
+          {
+            "name": "explain",
+            "description": "Explain the active file or selection"
+          },
+          {
+            "name": "refactor",
+            "description": "Suggest refactoring for active file or selection"
+          },
+          {
+            "name": "tests",
+            "description": "Generate tests for active file or selection"
+          },
+          {
+            "name": "agent",
+            "description": "Change the active prompt agent"
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "dependencies": {
+    "mammoth": "^1.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/vscode": "^1.98.0",
+    "typescript": "^5.5.4"
+  }
+}
