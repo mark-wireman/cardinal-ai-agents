@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph Drilldown</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --ink: #18212f;
+            --muted: #607188;
+            --line: #dde5ef;
+            --canvas: #f4f8fd;
+            --paper: rgba(255,255,255,0.9);
+            --primary: #145da0;
+            --accent: #ff7a59;
+            --shadow: 0 18px 50px rgba(18, 34, 57, 0.12);
+        }
+
+        html, body { width: 100%; height: 100%; overflow: hidden; }
+
+        body {
+            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(20, 93, 160, 0.14), transparent 24%),
+                linear-gradient(180deg, #f9fbfe 0%, #eef4fb 100%);
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            height: 100vh;
+        }
+
+        .sidebar {
+            background: var(--paper);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid rgba(255,255,255,0.7);
+            box-shadow: var(--shadow);
+            display: grid;
+            grid-template-rows: auto auto 1fr;
+            overflow: hidden;
+        }
+
+        .hero {
+            padding: 24px;
+            background: linear-gradient(135deg, rgba(20, 93, 160, 0.96), rgba(13, 43, 74, 0.92));
+            color: white;
+        }
+
+        .eyebrow { font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.78; margin-bottom: 12px; }
+        .title { font-size: 28px; line-height: 1.04; font-weight: 780; margin-bottom: 10px; }
+        .subtitle { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.84); }
+
+        .controls,
+        .details {
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .control-label,
+        .section-label {
+            color: var(--muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .control-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .field {
+            display: grid;
+            gap: 6px;
+        }
+
+        .field span { font-size: 12px; font-weight: 700; color: var(--muted); }
+
+        .field input,
+        .field select {
+            width: 100%;
+            padding: 11px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: white;
+            color: var(--ink);
+        }
+
+        .button-row { display: flex; gap: 10px; }
+
+        button {
+            appearance: none;
+            border: none;
+            border-radius: 12px;
+            padding: 11px 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .primary-btn { background: linear-gradient(135deg, var(--primary), #0b3d6f); color: white; }
+        .ghost-btn { background: white; color: var(--muted); border: 1px solid var(--line); }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .metric {
+            background: white;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 14px;
+        }
+
+        .metric-key { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 4px; }
+        .metric-value { font-size: 24px; font-weight: 800; }
+
+        .details-body {
+            overflow-y: auto;
+            padding-right: 4px;
+            display: grid;
+            gap: 12px;
+            align-content: start;
+        }
+
+        .detail-card {
+            background: white;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 14px;
+        }
+
+        .detail-key { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; margin-bottom: 6px; }
+        .detail-value { font-size: 13px; line-height: 1.6; word-break: break-word; }
+
+        .canvas-wrap {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            min-width: 0;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 18px;
+            background: rgba(255,255,255,0.74);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(24,33,47,0.08);
+        }
+
+        .topbar h2 { font-size: 20px; font-weight: 760; }
+        .topbar p { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+        .toolbar { display: flex; gap: 8px; }
+
+        .toolbar button {
+            padding: 10px 12px;
+            background: white;
+            color: var(--muted);
+            border: 1px solid var(--line);
+        }
+
+        .canvas {
+            position: relative;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        svg { width: 100%; height: 100%; display: block; }
+
+        .tooltip {
+            position: absolute;
+            display: none;
+            pointer-events: none;
+            background: rgba(24,33,47,0.94);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            z-index: 10;
+        }
+
+        .loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
+            background: rgba(244,248,253,0.8);
+            backdrop-filter: blur(4px);
+            z-index: 5;
+        }
+
+        .loading.hidden { display: none; }
+
+        .spinner {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: 3px solid #dfe8f3;
+            border-top-color: var(--primary);
+            animation: spin .75s linear infinite;
+        }
+
+        .node circle { stroke: white; stroke-width: 2px; }
+        .node text { pointer-events: none; }
+        .node.selected circle { stroke: var(--accent); stroke-width: 4px; }
+        .link { stroke-opacity: 0.45; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 1100px) {
+            .layout { grid-template-columns: 320px 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <main class="layout">
+        <aside class="sidebar">
+            <section class="hero">
+                <div class="eyebrow">Drilldown Graph View</div>
+                <div class="title" id="hero-title">Loading…</div>
+                <div class="subtitle" id="hero-subtitle">Preparing stat-specific graph slice.</div>
+            </section>
+
+            <section class="controls">
+                <div class="control-label">View Controls</div>
+                <div class="control-grid">
+                    <label class="field">
+                        <span>Node / edge limit</span>
+                        <select id="limit-select">
+                            <option value="200">200</option>
+                            <option value="400" selected>400</option>
+                            <option value="700">700</option>
+                            <option value="1000">1000</option>
+                            <option value="1500">1500</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Include neighbors</span>
+                        <select id="neighbors-select">
+                            <option value="1" selected>Yes</option>
+                            <option value="0">No</option>
+                        </select>
+                    </label>
+                    <div class="button-row">
+                        <button class="primary-btn" id="reload-btn">Reload Graph</button>
+                        <button class="ghost-btn" id="fit-btn">Fit View</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="details">
+                <div class="section-label">Selection</div>
+                <div class="metric-grid">
+                    <article class="metric">
+                        <div class="metric-key">Nodes</div>
+                        <div class="metric-value" id="metric-nodes">0</div>
+                    </article>
+                    <article class="metric">
+                        <div class="metric-key">Edges</div>
+                        <div class="metric-value" id="metric-edges">0</div>
+                    </article>
+                </div>
+                <div class="details-body" id="details-body">
+                    <article class="detail-card">
+                        <div class="detail-key">Status</div>
+                        <div class="detail-value">Select a node in the graph to inspect its details.</div>
+                    </article>
+                </div>
+            </section>
+        </aside>
+
+        <section class="canvas-wrap">
+            <header class="topbar">
+                <div>
+                    <h2 id="canvas-title">Graph drilldown</h2>
+                    <p id="canvas-subtitle">Focused graph slice from a selected statistic.</p>
+                </div>
+                <div class="toolbar">
+                    <button id="zoom-in">Zoom In</button>
+                    <button id="zoom-out">Zoom Out</button>
+                    <button id="center-btn">Center</button>
+                </div>
+            </header>
+            <section class="canvas" id="canvas-root">
+                <svg id="graph-svg"></svg>
+                <div class="tooltip" id="tooltip"></div>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <div>Loading graph slice…</div>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <script>
+        const API_BASE = "/api";
+        const params = new URLSearchParams(window.location.search);
+        const group = params.get("group") || "nodes";
+        const value = params.get("value") || "Unknown";
+
+        let nodes = [];
+        let links = [];
+        let nodeMap = {};
+        let svg;
+        let gMain;
+        let simulation;
+        let zoomBehavior;
+        let nodeSelection;
+        let linkSelection;
+        let labelSelection;
+
+        const layerColors = {
+            ts: "#145da0",
+            html: "#ff7a59",
+            css: "#1f9d67",
+            js: "#d18b16",
+            sql: "#8e63c8",
+            unknown: "#6b7d91",
+        };
+
+        function escapeHtml(value) {
+            const el = document.createElement("div");
+            el.textContent = String(value ?? "");
+            return el.innerHTML;
+        }
+
+        function truncate(value, len) {
+            const text = String(value ?? "");
+            return text.length > len ? `${text.slice(0, len - 1)}…` : text;
+        }
+
+        function setLoading(loading) {
+            document.getElementById("loading").classList.toggle("hidden", !loading);
+        }
+
+        function updateHeader(meta) {
+            const title = `${group.toUpperCase()} · ${value}`;
+            document.title = `${title} | Graph Drilldown`;
+            document.getElementById("hero-title").textContent = title;
+            document.getElementById("hero-subtitle").textContent = `Limit ${meta.limit}, neighbors ${meta.include_neighbors ? "on" : "off"}.`;
+            document.getElementById("canvas-title").textContent = title;
+            document.getElementById("canvas-subtitle").textContent = `${meta.returned_nodes.toLocaleString()} nodes · ${meta.returned_edges.toLocaleString()} edges in this slice.`;
+            document.getElementById("metric-nodes").textContent = meta.returned_nodes.toLocaleString();
+            document.getElementById("metric-edges").textContent = meta.returned_edges.toLocaleString();
+        }
+
+        function renderDetails(node) {
+            const details = document.getElementById("details-body");
+            details.innerHTML = `
+                <article class="detail-card">
+                    <div class="detail-key">Name</div>
+                    <div class="detail-value">${escapeHtml(node.name || node.id)}</div>
+                </article>
+                <article class="detail-card">
+                    <div class="detail-key">Kind</div>
+                    <div class="detail-value">${escapeHtml(node.kind || "Unknown")}</div>
+                </article>
+                <article class="detail-card">
+                    <div class="detail-key">Layer</div>
+                    <div class="detail-value">${escapeHtml(node.layer || "unknown")}</div>
+                </article>
+                <article class="detail-card">
+                    <div class="detail-key">Identifier</div>
+                    <div class="detail-value">${escapeHtml(node.id)}</div>
+                </article>
+                ${node.file ? `
+                    <article class="detail-card">
+                        <div class="detail-key">File</div>
+                        <div class="detail-value">${escapeHtml(node.file)}</div>
+                    </article>` : ""
+                }
+            `;
+        }
+
+        function nodeColor(node) {
+            return layerColors[node.layer] || "#6b7d91";
+        }
+
+        function radius(node) {
+            const kind = String(node.kind || "");
+            if (kind.includes("CLASS") || kind.includes("COMPONENT") || kind.includes("DOCUMENT")) return 11;
+            if (kind.includes("METHOD") || kind.includes("ELEMENT") || kind.includes("BINDING")) return 8;
+            return 9;
+        }
+
+        function buildGraph() {
+            svg = d3.select("#graph-svg");
+            const width = svg.node().clientWidth || 1000;
+            const height = svg.node().clientHeight || 700;
+            svg.selectAll("*").remove();
+
+            const defs = svg.append("defs");
+            defs.append("marker")
+                .attr("id", "arrow")
+                .attr("viewBox", "0 -5 10 10")
+                .attr("refX", 22)
+                .attr("refY", 0)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M0,-5L10,0L0,5")
+                .attr("fill", "#97a7bb");
+
+            gMain = svg.append("g");
+
+            const nodeCount = nodes.length;
+            simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(nodeCount > 500 ? 52 : 70).strength(0.35))
+                .force("charge", d3.forceManyBody().strength(nodeCount > 500 ? -95 : -180).distanceMax(300))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collide", d3.forceCollide().radius(d => radius(d) + 7))
+                .alphaDecay(nodeCount > 500 ? 0.05 : 0.03);
+
+            linkSelection = gMain.append("g")
+                .selectAll("line")
+                .data(links)
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .attr("stroke", "#97a7bb")
+                .attr("stroke-width", 1.4)
+                .attr("marker-end", "url(#arrow)");
+
+            nodeSelection = gMain.append("g")
+                .selectAll("g")
+                .data(nodes)
+                .enter()
+                .append("g")
+                .attr("class", "node")
+                .call(d3.drag()
+                    .on("start", (event, d) => {
+                        if (!event.active) simulation.alphaTarget(0.2).restart();
+                        d.fx = d.x;
+                        d.fy = d.y;
+                    })
+                    .on("drag", (event, d) => {
+                        d.fx = event.x;
+                        d.fy = event.y;
+                    })
+                    .on("end", (event, d) => {
+                        if (!event.active) simulation.alphaTarget(0);
+                        d.fx = null;
+                        d.fy = null;
+                    }))
+                .on("click", (event, d) => {
+                    event.stopPropagation();
+                    nodeSelection.classed("selected", n => n.id === d.id);
+                    renderDetails(d);
+                })
+                .on("mousemove", (event, d) => {
+                    const tooltip = document.getElementById("tooltip");
+                    tooltip.innerHTML = `<strong>${escapeHtml(d.name || d.id)}</strong><br>${escapeHtml(d.kind || "Unknown")}`;
+                    tooltip.style.display = "block";
+                    tooltip.style.left = `${event.offsetX + 16}px`;
+                    tooltip.style.top = `${event.offsetY + 16}px`;
+                })
+                .on("mouseleave", () => {
+                    document.getElementById("tooltip").style.display = "none";
+                });
+
+            nodeSelection.append("circle")
+                .attr("r", d => radius(d))
+                .attr("fill", d => nodeColor(d));
+
+            labelSelection = gMain.append("g")
+                .selectAll("text")
+                .data(nodes)
+                .enter()
+                .append("text")
+                .attr("font-size", 11)
+                .attr("fill", "#334155")
+                .attr("text-anchor", "middle")
+                .text(d => truncate(d.name || d.id, 18));
+
+            simulation.on("tick", () => {
+                linkSelection
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                nodeSelection.attr("transform", d => `translate(${d.x},${d.y})`);
+                labelSelection.attr("x", d => d.x).attr("y", d => d.y + radius(d) + 13);
+            });
+
+            zoomBehavior = d3.zoom()
+                .scaleExtent([0.03, 8])
+                .on("zoom", event => gMain.attr("transform", event.transform));
+
+            svg.call(zoomBehavior).on("click", () => {
+                nodeSelection.classed("selected", false);
+            });
+
+            setTimeout(fitGraph, Math.min(3000, nodeCount * 6));
+        }
+
+        function fitGraph() {
+            if (!gMain) return;
+            try {
+                const bounds = gMain.node().getBBox();
+                if (!bounds.width || !bounds.height) return;
+                const width = svg.node().clientWidth;
+                const height = svg.node().clientHeight;
+                const scale = Math.min(0.9 * width / bounds.width, 0.9 * height / bounds.height, 3);
+                const midX = bounds.x + bounds.width / 2;
+                const midY = bounds.y + bounds.height / 2;
+                svg.transition().duration(550).call(
+                    zoomBehavior.transform,
+                    d3.zoomIdentity.translate(width / 2, height / 2).scale(scale).translate(-midX, -midY)
+                );
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function loadGraph() {
+            setLoading(true);
+            try {
+                const limit = document.getElementById("limit-select").value;
+                const neighbors = document.getElementById("neighbors-select").value;
+                const url = `${API_BASE}/graph/by-stat?group=${encodeURIComponent(group)}&value=${encodeURIComponent(value)}&limit=${encodeURIComponent(limit)}&neighbors=${encodeURIComponent(neighbors)}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const payload = await response.json();
+                const meta = payload.meta || {};
+
+                nodes = payload.nodes || [];
+                nodeMap = {};
+                nodes.forEach(node => { nodeMap[node.id] = node; });
+
+                const rawLinks = payload.links || payload.edges || [];
+                links = rawLinks.map(link => {
+                    const source = typeof link.source === "number" ? nodes[link.source] : nodeMap[link.source];
+                    const target = typeof link.target === "number" ? nodes[link.target] : nodeMap[link.target];
+                    return source && target ? { ...link, source, target } : null;
+                }).filter(Boolean);
+
+                updateHeader(meta);
+                buildGraph();
+            } catch (error) {
+                console.error(error);
+                document.getElementById("details-body").innerHTML = `
+                    <article class="detail-card">
+                        <div class="detail-key">Error</div>
+                        <div class="detail-value">Failed to load the drilldown graph for ${escapeHtml(value)}.</div>
+                    </article>`;
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        document.getElementById("reload-btn").addEventListener("click", loadGraph);
+        document.getElementById("fit-btn").addEventListener("click", fitGraph);
+        document.getElementById("center-btn").addEventListener("click", fitGraph);
+        document.getElementById("zoom-in").addEventListener("click", () => svg && svg.transition().duration(250).call(zoomBehavior.scaleBy, 1.25));
+        document.getElementById("zoom-out").addEventListener("click", () => svg && svg.transition().duration(250).call(zoomBehavior.scaleBy, 0.8));
+        window.addEventListener("load", loadGraph);
+    </script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0" version="29.5.5">
+  <diagram name="Gemini-Apigee MCP Comprehensive" id="1">
+    <mxGraphModel dx="1418" dy="2116" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1400" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rectangle;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#f8cecc;" value="Backend Code Generator Agent" vertex="1">
+          <mxGeometry height="60" width="200" x="170" y="-110" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rectangle;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#f8cecc;" value="Frontend Code Generator Agent" vertex="1">
+          <mxGeometry height="60" width="200" x="170" y="-30" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rectangle;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#f8cecc;" value="User Story Generator Agent" vertex="1">
+          <mxGeometry height="60" width="200" x="170" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="rectangle;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#f8cecc;" value="Code Review Agent" vertex="1">
+          <mxGeometry height="60" width="200" x="170" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="rectangle;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#f8cecc;" value="Katalon Test Generator Agent" vertex="1">
+          <mxGeometry height="60" width="200" x="170" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rectangle;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#f8cecc;" value="Gemini Specialist Agent" vertex="1">
+          <mxGeometry height="60" width="200" x="170" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rectangle;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#fff2cc;" value="MCP Server (gemini-apigee-server)" vertex="1">
+          <mxGeometry height="100" width="220" x="540" y="-50" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rectangle;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#e1d5e7;" value="Token Cache" vertex="1">
+          <mxGeometry height="60" width="120" x="910" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rectangle;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#b7e1cd;" value="Environment Variables (.env)" vertex="1">
+          <mxGeometry height="60" width="220" x="540" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rectangle;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#d5e8d4;" value="Apigee Auth" vertex="1">
+          <mxGeometry height="60" width="120" x="830" y="-130" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rectangle;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#dae8fc;" value="Gemini AI" vertex="1">
+          <mxGeometry height="60" width="120" x="1030" y="-30" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="ellipse;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#b7e1cd;" value="User" vertex="1">
+          <mxGeometry height="60" width="120" x="210" y="-260" as="geometry" />
+        </mxCell>
+        <mxCell id="14" edge="1" parent="1" source="2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="15" edge="1" parent="1" source="3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="16" edge="1" parent="1" source="4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="17" edge="1" parent="1" source="5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="18" edge="1" parent="1" source="6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="19" edge="1" parent="1" source="7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="20" edge="1" parent="1" source="13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="21" edge="1" parent="1" source="8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;" target="9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="22" edge="1" parent="1" source="8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;" target="10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="23" edge="1" parent="1" source="8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;" target="11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="24" edge="1" parent="1" source="11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;" target="12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="25" edge="1" parent="1" source="12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="26" edge="1" parent="1" source="8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;startArrow=classic;startFill=1;endArrow=none;endFill=0;" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

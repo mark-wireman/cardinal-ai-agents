@@ -1,0 +1,59 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Deep RL Agent C++ build artifacts (multi-agent binary)
+deep-rl-cpp-master/build/
+*.o
+*.obj
+*.a
+*.lib
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+reverse_engineering/kg_output*/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+
+# Transcription outputs
+*.txt
+!src/README.md
+!VALIDATION.md
+!HOWTO.md
+medium
+medium.en.pt.txt
+base.en.pt.txt
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+context/
+
+# OS files
+Thumbs.db
+desktop.ini
+
+# Whisper model files
+*.pt

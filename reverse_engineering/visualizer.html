@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Graph Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --ink: #18212f;
+            --muted: #5f6f86;
+            --line: rgba(24, 33, 47, 0.12);
+            --paper: rgba(255, 255, 255, 0.82);
+            --paper-strong: rgba(255, 255, 255, 0.94);
+            --primary: #145da0;
+            --accent: #ff7a59;
+            --success: #1f9d67;
+            --warning: #d18b16;
+            --neutral: #63748b;
+            --shadow: 0 20px 60px rgba(21, 41, 73, 0.12);
+            --radius-xl: 26px;
+            --radius-lg: 18px;
+        }
+
+        html, body { min-height: 100%; }
+
+        body {
+            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(20, 93, 160, 0.16), transparent 28%),
+                radial-gradient(circle at top right, rgba(255, 122, 89, 0.16), transparent 28%),
+                linear-gradient(180deg, #f8fbff 0%, #edf3fb 100%);
+            padding: 28px;
+        }
+
+        .shell { max-width: 1500px; margin: 0 auto; display: grid; gap: 22px; }
+
+        .hero { display: grid; grid-template-columns: 1.3fr .7fr; gap: 20px; }
+
+        .hero-card,
+        .panel,
+        .group-card {
+            background: var(--paper);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.6);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow);
+        }
+
+        .hero-card {
+            padding: 28px;
+            background: linear-gradient(135deg, rgba(20, 93, 160, 0.94), rgba(10, 37, 64, 0.92));
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-card::after {
+            content: "";
+            position: absolute;
+            width: 320px;
+            height: 320px;
+            right: -120px;
+            top: -120px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+
+        .eyebrow { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.78; margin-bottom: 14px; }
+        .hero-title { font-size: clamp(30px, 4vw, 46px); line-height: 1.02; font-weight: 750; max-width: 12ch; margin-bottom: 14px; }
+        .hero-copy { max-width: 56ch; color: rgba(255,255,255,0.85); font-size: 15px; line-height: 1.65; }
+        .hero-meta { margin-top: 24px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .meta-pill {
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.16);
+            font-size: 12px;
+        }
+
+        .graph-picker {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.16);
+            font-size: 12px;
+            color: white;
+        }
+
+        .graph-picker.visible { display: inline-flex; }
+
+        .graph-picker select {
+            background: rgba(255,255,255,0.18);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.24);
+            border-radius: 8px;
+            padding: 5px 8px;
+            font-size: 12px;
+            min-width: 210px;
+        }
+
+        .graph-picker select:focus { outline: none; }
+
+        .graph-picker option {
+            color: #18212f;
+            background: white;
+        }
+
+        .summary-panel { padding: 22px; display: grid; gap: 12px; align-content: start; }
+        .panel-label { color: var(--muted); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
+        .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+        .summary-card {
+            padding: 16px;
+            border-radius: var(--radius-lg);
+            background: rgba(255,255,255,0.96);
+            border: 1px solid var(--line);
+            min-height: 104px;
+            display: grid;
+            align-content: space-between;
+        }
+
+        .summary-card.primary { background: linear-gradient(180deg, #edf7ff, white); }
+        .summary-card.accent { background: linear-gradient(180deg, #fff1eb, white); }
+        .summary-card.success { background: linear-gradient(180deg, #edfdf4, white); }
+        .summary-card.warning { background: linear-gradient(180deg, #fff8e7, white); }
+        .summary-card.neutral { background: linear-gradient(180deg, #f7f9fc, white); }
+
+        .summary-key { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+        .summary-value { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; }
+
+        .groups {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+            align-items: start;
+        }
+
+        .group-card {
+            padding: 20px;
+            display: grid;
+            gap: 16px;
+            min-height: 520px;
+            align-self: start;
+        }
+        .group-head { display: flex; justify-content: space-between; align-items: end; gap: 10px; }
+        .group-title { font-size: 22px; font-weight: 760; }
+        .group-subtitle { color: var(--muted); font-size: 13px; line-height: 1.5; margin-top: 4px; }
+
+        .group-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .group-stat-count {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #f3f6fb;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .toggle-btn {
+            appearance: none;
+            border: 1px solid rgba(20, 93, 160, 0.16);
+            border-radius: 999px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.96);
+            color: var(--primary);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+
+        .toggle-btn:hover {
+            border-color: rgba(20, 93, 160, 0.3);
+            background: #eef6fd;
+        }
+
+        .group-list { display: grid; gap: 12px; align-content: start; }
+
+        .stat-item {
+            background: rgba(255,255,255,0.96);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+            display: grid;
+            gap: 12px;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 38px rgba(21, 41, 73, 0.09);
+            border-color: rgba(20, 93, 160, 0.24);
+        }
+
+        .stat-top { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+        .stat-name { font-size: 16px; font-weight: 720; word-break: break-word; }
+        .stat-count { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+        .stat-description { color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+        .kind-hint {
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1.5;
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: rgba(20, 93, 160, 0.06);
+            border: 1px solid rgba(20, 93, 160, 0.14);
+        }
+
+        .progress-track { height: 10px; border-radius: 999px; background: #edf1f6; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary), var(--accent)); }
+
+        .stat-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        .share-label { color: var(--muted); font-size: 12px; font-weight: 700; }
+
+        .view-btn {
+            appearance: none;
+            border: none;
+            border-radius: 12px;
+            padding: 10px 14px;
+            background: linear-gradient(135deg, var(--primary), #0b3d6f);
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 12px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .view-btn:hover { filter: brightness(1.05); }
+
+        .empty,
+        .loading,
+        .error {
+            padding: 28px;
+            text-align: center;
+            color: var(--muted);
+            background: rgba(255,255,255,0.96);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--line);
+        }
+
+        .footer-note { padding: 16px 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+        @media (max-width: 1280px) { .groups { grid-template-columns: 1fr; } }
+        @media (max-width: 960px) {
+            body { padding: 18px; }
+            .hero { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 680px) { .summary-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="hero">
+            <article class="hero-card">
+                <div class="eyebrow">Knowledge Graph Intelligence</div>
+                <h1 class="hero-title">Statistics-first architecture exploration.</h1>
+                <p class="hero-copy">
+                    Start with the structural story in the graph statistics, then open a focused graph window for any node kind,
+                    edge kind, or layer that needs inspection. The landing page stays fast and readable even for very large graphs.
+                </p>
+                <div class="hero-meta">
+                    <div class="meta-pill" id="stats-source">Loading statistics source…</div>
+                    <div class="graph-picker" id="graph-picker-wrap">
+                        <span>Graph file</span>
+                        <select id="graph-picker" onchange="switchGraph(this.value)"></select>
+                    </div>
+                    <div class="meta-pill">Popup graph windows are scoped to the selected statistic</div>
+                </div>
+            </article>
+
+            <aside class="summary-panel panel">
+                <div class="panel-label">Snapshot</div>
+                <div class="summary-grid" id="summary-grid">
+                    <div class="loading">Loading summary…</div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="groups" id="groups-root">
+            <div class="loading">Loading dashboard sections…</div>
+        </section>
+
+        <section class="panel footer-note">
+            Select any statistic card to open a separate drill-down graph view. Layers open layer-scoped subgraphs, node kinds open a graph for that kind, and edge kinds open the graph formed by edges of the selected relationship type.
+        </section>
+    </main>
+
+    <script>
+        const API_BASE = "/api";
+        const GROUP_ORDER = ["nodes", "edges", "layers"];
+        const COLLAPSED_ITEM_LIMIT = 14;
+        let dashboardData = null;
+        let expandedGroups = {};
+        let currentGraphFile = "";
+
+        function formatValue(value) {
+            if (typeof value === "number") {
+                return Number.isInteger(value)
+                    ? value.toLocaleString()
+                    : value.toLocaleString(undefined, { maximumFractionDigits: 6 });
+            }
+            return value;
+        }
+
+        function escapeHtml(value) {
+            const el = document.createElement("div");
+            el.textContent = String(value ?? "");
+            return el.innerHTML;
+        }
+
+        function escapeAttr(value) {
+            return String(value ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+        }
+
+        function openDrilldown(group, value) {
+            const params = new URLSearchParams({ group, value });
+            const url = `/graph-view?${params.toString()}`;
+            window.open(url, `${group}-${value}`, "width=1480,height=980,resizable=yes,scrollbars=yes");
+        }
+
+        function renderGraphPicker(files, current) {
+            const wrap = document.getElementById("graph-picker-wrap");
+            const select = document.getElementById("graph-picker");
+
+            if (!Array.isArray(files) || files.length <= 1) {
+                wrap.classList.remove("visible");
+                select.innerHTML = "";
+                return;
+            }
+
+            select.innerHTML = files.map(file =>
+                `<option value="${escapeHtml(file)}" ${file === current ? "selected" : ""}>${escapeHtml(file)}</option>`
+            ).join("");
+            wrap.classList.add("visible");
+        }
+
+        async function loadGraphList() {
+            try {
+                const response = await fetch(`${API_BASE}/graphs`);
+                if (!response.ok) return;
+                const data = await response.json();
+                currentGraphFile = data.current || "";
+                renderGraphPicker(data.files || [], currentGraphFile);
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function switchGraph(fileName) {
+            if (!fileName || fileName === currentGraphFile) return;
+            try {
+                const response = await fetch(`${API_BASE}/graphs/select`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ file: fileName }),
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const result = await response.json();
+                currentGraphFile = result.current || fileName;
+                expandedGroups = {};
+                await loadDashboard();
+                await loadGraphList();
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        function renderSummary(cards) {
+            const root = document.getElementById("summary-grid");
+            root.innerHTML = cards.map(card => `
+                <article class="summary-card ${card.tone || "neutral"}">
+                    <div class="summary-key">${escapeHtml(card.label)}</div>
+                    <div class="summary-value">${escapeHtml(formatValue(card.value))}</div>
+                </article>
+            `).join("");
+        }
+
+        function renderGroup(groupData) {
+            const items = groupData.items || [];
+            const isExpanded = !!expandedGroups[groupData.group];
+            const visibleItems = isExpanded ? items : items.slice(0, COLLAPSED_ITEM_LIMIT);
+            const hasOverflow = items.length > COLLAPSED_ITEM_LIMIT;
+            return `
+                <section class="group-card">
+                    <div class="group-head">
+                        <div>
+                            <h2 class="group-title">${escapeHtml(groupData.title)}</h2>
+                            <p class="group-subtitle">Choose a statistic to open a dedicated graph window scoped to that slice of the knowledge graph.</p>
+                        </div>
+                        <div class="group-meta">
+                            <div class="group-stat-count">${items.length} stats</div>
+                            ${hasOverflow ? `<button class="toggle-btn" onclick="toggleGroup('${escapeAttr(groupData.group)}')">${isExpanded ? "Show Less" : `Show All (${items.length})`}</button>` : ""}
+                        </div>
+                    </div>
+                    <div class="group-list">
+                        ${visibleItems.map(item => `
+                            <article class="stat-item">
+                                <div class="stat-top">
+                                    <div class="stat-name">${escapeHtml(item.name)}</div>
+                                    <div class="stat-count">${escapeHtml(formatValue(item.count))}</div>
+                                </div>
+                                <div class="stat-description">${escapeHtml(item.description || "")}</div>
+                                ${Array.isArray(item.kinds) && item.kinds.length
+                                    ? `<div class="kind-hint">Kinds: ${escapeHtml(item.kinds.slice(0, 8).join(", "))}${item.kinds.length > 8 ? " …" : ""}</div>`
+                                    : ""
+                                }
+                                <div class="progress-track">
+                                    <div class="progress-fill" style="width:${Math.max(2, (item.share || 0) * 100)}%"></div>
+                                </div>
+                                <div class="stat-footer">
+                                    <div class="share-label">${((item.share || 0) * 100).toFixed(2)}% of total</div>
+                                    <button class="view-btn" onclick="openDrilldown('${escapeAttr(item.drill_group || groupData.group)}', '${escapeAttr(item.name)}')">Open Graph</button>
+                                </div>
+                            </article>
+                        `).join("")}
+                    </div>
+                </section>
+            `;
+        }
+
+        function renderGroups() {
+            const groupsRoot = document.getElementById("groups-root");
+            groupsRoot.innerHTML = GROUP_ORDER
+                .map(key => dashboardData?.groups?.[key])
+                .filter(Boolean)
+                .map(renderGroup)
+                .join("");
+
+            if (!groupsRoot.innerHTML.trim()) {
+                groupsRoot.innerHTML = '<div class="empty">No dashboard statistics are available.</div>';
+            }
+        }
+
+        function toggleGroup(groupKey) {
+            expandedGroups[groupKey] = !expandedGroups[groupKey];
+            renderGroups();
+        }
+
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/dashboard`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                dashboardData = await response.json();
+
+                const activeGraph = dashboardData.graph_file || currentGraphFile || "(unknown)";
+                document.getElementById("stats-source").textContent = `Graph: ${activeGraph} · Stats source: ${dashboardData.source}`;
+                renderSummary(dashboardData.summary || []);
+                renderGroups();
+            } catch (error) {
+                console.error(error);
+                document.getElementById("summary-grid").innerHTML = '<div class="error">Failed to load dashboard summary.</div>';
+                document.getElementById("groups-root").innerHTML = '<div class="error">Failed to load drill-down statistics.</div>';
+            }
+        }
+
+        window.addEventListener("load", async () => {
+            await loadGraphList();
+            await loadDashboard();
+        });
+    </script>
+</body>
+</html>
