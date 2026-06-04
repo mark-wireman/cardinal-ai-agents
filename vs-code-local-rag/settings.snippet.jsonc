@@ -1,18 +1,20 @@
 // ============================================================================
 // settings.json snippet  (Command Palette -> "Preferences: Open User Settings (JSON)")
 // ----------------------------------------------------------------------------
-// Use this user-level form if you want the RAG server available across all
+// Use this user-level form if you want the server available across all
 // workspaces. In user settings, the server map lives UNDER an "mcp" key.
 // If you instead use .vscode/mcp.json, the same block sits at the top level.
+// The RAG tools are now consolidated into the root mcp-server.js alongside
+// the Gemini/Apigee and deep-rl tools.
 // ============================================================================
 {
   "mcp": {
     "inputs": [],
     "servers": {
-      "codebase-rag": {
+      "gemini-apigee-server": {
         "type": "stdio",
         "command": "node",
-        "args": ["/absolute/path/to/copilot-rag-mcp/dist/server.js"],
+        "args": ["/absolute/path/to/agents-deployment-package/mcp-server.js"],
         "env": {
           "REPO_ROOT": "${workspaceFolder}",
           "OLLAMA_BASE_URL": "http://localhost:11434",

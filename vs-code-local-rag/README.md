@@ -47,9 +47,35 @@ npm run index                         # add -- --force to rebuild from scratch
 
 ## Wire it into VS Code
 
-Copy `.vscode/mcp.json` into your **target repo** (the one Copilot edits), or use
-the `settings.snippet.jsonc` form for a user-level install. Replace the absolute
-path to `dist/server.js`. Then:
+The RAG tools (search_code, get_context, list_indexed_files, reindex) are now
+consolidated into the root `mcp-server.js`. Configure VS Code to use it
+directly — no separate `mcp.json` is needed.
+
+In your target repo's `.vscode/mcp.json` or user `settings.json`, point the
+server to `mcp-server.js` and include the RAG environment variables:
+
+```jsonc
+{
+  "servers": {
+    "gemini-apigee-server": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/absolute/path/to/agents-deployment-package/mcp-server.js"],
+      "env": {
+        "REPO_ROOT": "${workspaceFolder}",
+        "OLLAMA_BASE_URL": "http://localhost:11434",
+        "EMBED_MODEL": "nomic-embed-text",
+        "CHROMA_URL": "http://localhost:8000",
+        "COLLECTION": "codebase",
+        "DEFAULT_TOP_K": "8",
+        "DEFAULT_TOKEN_BUDGET": "2200"
+      }
+    }
+  }
+}
+```
+
+Then:
 
 1. Reload VS Code.
 2. Command Palette -> **MCP: Show MCP Servers** -> confirm `codebase-rag` is
