@@ -18,8 +18,8 @@ export interface AgentDefinition {
   model?: string;
   /** Absolute path to the source .md file */
   filePath: string;
-  /** 'workspace' | 'user' | 'claude' — where the file was found */
-  scope: 'workspace' | 'user' | 'claude';
+  /** 'workspace' | 'user' | 'claude' | 'deployed' — where the file was found */
+  scope: 'workspace' | 'user' | 'claude' | 'deployed';
 }
 
 // ── YAML frontmatter parser ────────────────────────────────────────────────────
@@ -152,6 +152,33 @@ function toTitleCase(s: string): string {
  *  2. <workspace>/.claude/agents     – Claude-compatible agents
  *  3. <vscode-user>/agents           – personal agents (all workspaces)
  */
+/**
+ * Locate the agents-deployment-package root by walking up from the extension
+ * directory or scanning workspace folders for a known marker (mcp-server.js).
+ */
+function findDeploymentPackageRoot(): string | undefined {
+  // Check workspace folders first
+  for (const folder of vscode.workspace.workspaceFolders ?? []) {
+    const root = folder.uri.fsPath;
+    if (fs.existsSync(path.join(root, 'mcp-server.js'))) {
+      return root;
+    }
+  }
+
+  // Walk up from __dirname (the extension's out/ directory)
+  let dir = __dirname;
+  for (let i = 0; i < 5; i++) {
+    if (fs.existsSync(path.join(dir, 'mcp-server.js'))) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) { break; }
+    dir = parent;
+  }
+
+  return undefined;
+}
+
 export function discoverAgents(): AgentDefinition[] {
   const found: AgentDefinition[] = [];
 
@@ -162,13 +189,21 @@ export function discoverAgents(): AgentDefinition[] {
     found.push(...readAgentFiles(path.join(root, '.claude', 'agents'), 'claude'));
   }
 
-  // 2. User-profile agents
+  // 2. Deployment-package agents (agent .md files at the package root)
+  const deployRoot = findDeploymentPackageRoot();
+  if (deployRoot) {
+    // Scan the extension's own directory for bundled agent .md files
+    const extDir = path.join(deployRoot, 'vs-code-local-agent-ui');
+    found.push(...readAgentFiles(extDir, 'deployed'));
+  }
+
+  // 3. User-profile agents
   const userDir = getUserDataDir();
   if (userDir) {
     found.push(...readAgentFiles(path.join(userDir, 'agents'), 'user'));
   }
 
-  // Deduplicate by filePath, preserving order (workspace wins over user)
+  // Deduplicate by filePath, preserving order (workspace wins over deployed/user)
   const seen = new Set<string>();
   return found.filter(a => {
     if (seen.has(a.filePath)) { return false; }
@@ -183,6 +218,7 @@ const SCOPE_LABELS: Record<AgentDefinition['scope'], string> = {
   workspace: '$(repo)  Workspace',
   user:      '$(person) User profile',
   claude:    '$(sparkle) Claude',
+  deployed:  '$(package) Deployment Package',
 };
 
 /**
@@ -195,7 +231,7 @@ export async function pickAgent(
 ): Promise<AgentDefinition | undefined> {
   if (agents.length === 0) {
     const open = await vscode.window.showInformationMessage(
-      'No agent files found in .github/agents or your user profile.',
+      'No agent files found in .github/agents, deployment package, or user profile.',
       'Create one'
     );
     if (open === 'Create one') {

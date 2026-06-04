@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { createReviewerParticipant } from './participant';
 import { ReviewPanel } from './reviewPanel';
 import { discoverAgents, pickAgent, type AgentDefinition } from './agentLoader';
+import { ServiceManager } from './serviceManager';
 
 // ── Module-level active agent state ───────────────────────────────────────────
 let activeAgent: AgentDefinition | undefined;
@@ -122,8 +123,9 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // File watcher: refresh when agent files change
+  // File watcher: refresh when agent files change (workspace + deployment package)
   const watcher = vscode.workspace.createFileSystemWatcher('**/{.github,.claude}/agents/*.md');
+  const deployedWatcher = vscode.workspace.createFileSystemWatcher('**/vs-code-local-agent-ui/*.md');
   const onAgentFilesChanged = () => {
     const agents = discoverAgents();
     // Clear active if its file was removed
@@ -136,7 +138,72 @@ export function activate(context: vscode.ExtensionContext) {
   watcher.onDidCreate(onAgentFilesChanged);
   watcher.onDidChange(onAgentFilesChanged);
   watcher.onDidDelete(onAgentFilesChanged);
-  context.subscriptions.push(watcher);
+  deployedWatcher.onDidCreate(onAgentFilesChanged);
+  deployedWatcher.onDidChange(onAgentFilesChanged);
+  deployedWatcher.onDidDelete(onAgentFilesChanged);
+  context.subscriptions.push(watcher, deployedWatcher);
+
+  // ── Service Manager commands ─────────────────────────────────────────────────
+  const svcMgr = ServiceManager.getInstance();
+  context.subscriptions.push({ dispose: () => svcMgr.dispose() });
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('copilot-reviewer.startService', async () => {
+      const services = svcMgr.getServices().filter(s => s.status === 'stopped');
+      if (services.length === 0) {
+        vscode.window.showInformationMessage('All services are already running.');
+        return;
+      }
+      const pick = await vscode.window.showQuickPick(
+        services.map(s => ({
+          label: `${s.definition.icon} ${s.definition.name}`,
+          description: s.definition.description,
+          detail: s.definition.prerequisites ? `Requires: ${s.definition.prerequisites}` : undefined,
+          serviceId: s.definition.id,
+        })),
+        { title: 'Start a Service', placeHolder: 'Select a service to start…' }
+      );
+      if (pick) {
+        await svcMgr.startService((pick as { serviceId: string }).serviceId);
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('copilot-reviewer.stopService', async () => {
+      const services = svcMgr.getServices().filter(s => s.status === 'running' || s.status === 'starting');
+      if (services.length === 0) {
+        vscode.window.showInformationMessage('No services are currently running.');
+        return;
+      }
+      const pick = await vscode.window.showQuickPick(
+        services.map(s => ({
+          label: `${s.definition.icon} ${s.definition.name}`,
+          description: `Running since ${s.startedAt ? new Date(s.startedAt).toLocaleTimeString() : 'unknown'}`,
+          serviceId: s.definition.id,
+        })),
+        { title: 'Stop a Service', placeHolder: 'Select a service to stop…' }
+      );
+      if (pick) {
+        await svcMgr.stopService((pick as { serviceId: string }).serviceId);
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('copilot-reviewer.startAllServices', async () => {
+      const coreServices = ['ollama', 'chromadb', 'mcp-server'];
+      for (const id of coreServices) {
+        const svc = svcMgr.getService(id);
+        if (svc && svc.status === 'stopped') {
+          await svcMgr.startService(id);
+          // Stagger start to allow dependencies to initialize
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      }
+      vscode.window.showInformationMessage('Core services started.');
+    })
+  );
 }
 
 export function deactivate() {}

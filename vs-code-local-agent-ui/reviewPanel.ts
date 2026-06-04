@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as mammoth from 'mammoth';
 import { getActiveAgent, setActiveAgent } from './extension';
 import { discoverAgents, type AgentDefinition } from './agentLoader';
+import { ServiceManager } from './serviceManager';
 
 type ActivityKind = 'info' | 'progress' | 'warn' | 'error' | 'done';
 type ActivityGroup = 'model' | 'prompt' | 'streaming' | 'finalize';
@@ -90,6 +91,7 @@ export class ReviewPanel {
         format?: 'markdown' | 'json';
         reportContent?: string;
         text?: string;
+        serviceId?: string;
       }) => {
         try {
           switch (msg.command) {
@@ -161,6 +163,11 @@ export class ReviewPanel {
             });
             // Discover and push available models once the webview is alive.
             this._refreshAvailableModels();
+            // Push current service states
+            this._panel.webview.postMessage({
+              command: 'servicesUpdated',
+              services: ServiceManager.getInstance().toWebviewPayload(),
+            });
             break;
           case 'selectModel':
             this._selectedModelId = msg.text || undefined;
@@ -203,6 +210,71 @@ export class ReviewPanel {
               });
             }
             break;
+          case 'startService': {
+            if (msg.serviceId) {
+              const svcMgr = ServiceManager.getInstance();
+              try {
+                await svcMgr.startService(msg.serviceId);
+                this._panel.webview.postMessage({
+                  command: 'info',
+                  text: `Starting ${msg.serviceId}...`,
+                });
+              } catch (err) {
+                const errText = err instanceof Error ? err.message : String(err);
+                this._panel.webview.postMessage({
+                  command: 'error',
+                  text: `Failed to start ${msg.serviceId}: ${errText}`,
+                });
+              }
+            }
+            break;
+          }
+          case 'stopService': {
+            if (msg.serviceId) {
+              const svcMgr = ServiceManager.getInstance();
+              try {
+                await svcMgr.stopService(msg.serviceId);
+                this._panel.webview.postMessage({
+                  command: 'info',
+                  text: `Stopped ${msg.serviceId}.`,
+                });
+              } catch (err) {
+                const errText = err instanceof Error ? err.message : String(err);
+                this._panel.webview.postMessage({
+                  command: 'error',
+                  text: `Failed to stop ${msg.serviceId}: ${errText}`,
+                });
+              }
+            }
+            break;
+          }
+          case 'restartService': {
+            if (msg.serviceId) {
+              const svcMgr = ServiceManager.getInstance();
+              try {
+                await svcMgr.restartService(msg.serviceId);
+                this._panel.webview.postMessage({
+                  command: 'info',
+                  text: `Restarting ${msg.serviceId}...`,
+                });
+              } catch (err) {
+                const errText = err instanceof Error ? err.message : String(err);
+                this._panel.webview.postMessage({
+                  command: 'error',
+                  text: `Failed to restart ${msg.serviceId}: ${errText}`,
+                });
+              }
+            }
+            break;
+          }
+          case 'refreshServices': {
+            const svcMgr = ServiceManager.getInstance();
+            this._panel.webview.postMessage({
+              command: 'servicesUpdated',
+              services: svcMgr.toWebviewPayload(),
+            });
+            break;
+          }
           }
         } catch (err) {
           const text = err instanceof Error ? err.message : String(err);
@@ -217,6 +289,17 @@ export class ReviewPanel {
     );
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+    // Listen for service status changes and push updates to the webview
+    const svcMgr = ServiceManager.getInstance();
+    this._disposables.push(
+      svcMgr.onDidChangeStatus(() => {
+        this._panel.webview.postMessage({
+          command: 'servicesUpdated',
+          services: svcMgr.toWebviewPayload(),
+        });
+      })
+    );
   }
 
   // ── Public: called by extension when agent changes ─────────────────────────
@@ -242,6 +325,59 @@ export class ReviewPanel {
         isActive: a.filePath === getActiveAgent()?.filePath,
       })),
     });
+  }
+
+  // ── MCP tool integration (agents-deployment-package) ─────────────────────────
+
+  /**
+   * Attempt to call an MCP tool by name using VS Code's language model tools API.
+   * Returns the text result or null if the tool is unavailable.
+   */
+  private async _callMcpTool(
+    toolName: string,
+    input: Record<string, unknown>,
+    token: vscode.CancellationToken
+  ): Promise<string | null> {
+    try {
+      if (!vscode.lm || typeof vscode.lm.invokeTool !== 'function') {
+        return null;
+      }
+      const result = await vscode.lm.invokeTool(toolName, { input }, token);
+      // The result is a LanguageModelToolResult with content parts
+      if (result && typeof result === 'object' && 'content' in result) {
+        const parts = (result as { content: Array<{ type: string; value?: string }> }).content;
+        return parts
+          .filter((p: { type: string }) => p.type === 'text')
+          .map((p: { value?: string }) => p.value ?? '')
+          .join('\n');
+      }
+      return String(result);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Fetch RAG context from the deployment package's MCP server (get_context tool)
+   * to ground the agent's response in relevant codebase knowledge.
+   */
+  private async _fetchRagContext(
+    query: string,
+    runId: number,
+    token: vscode.CancellationToken
+  ): Promise<string> {
+    this._postActivity(runId, 'prompt', 'progress', 'Fetching RAG context from codebase index...');
+    const result = await this._callMcpTool(
+      'get_context',
+      { query, token_budget: 2200 },
+      token
+    );
+    if (result && !result.includes('No context fit') && !result.includes('No matches')) {
+      this._postActivity(runId, 'prompt', 'done', `RAG context retrieved (${result.length} chars)`);
+      return result;
+    }
+    this._postActivity(runId, 'prompt', 'info', 'No RAG context available (index may be empty)');
+    return '';
   }
 
   // ── Public: run a live review ──────────────────────────────────────────────
@@ -443,8 +579,8 @@ export class ReviewPanel {
   }
 
   private _getPanelAgents(allAgents: AgentDefinition[]): AgentDefinition[] {
-    const workspaceAgents = allAgents.filter(a => a.scope === 'workspace');
-    return workspaceAgents.length > 0 ? workspaceAgents : allAgents;
+    const priorityAgents = allAgents.filter(a => a.scope === 'workspace' || a.scope === 'deployed');
+    return priorityAgents.length > 0 ? priorityAgents : allAgents;
   }
 
   private async _executeAgentTask(options: {
@@ -517,6 +653,14 @@ export class ReviewPanel {
 
       this._postActivity(runId, 'model', 'info', `Model selected: ${model.vendor}/${model.family}`);
 
+      // Fetch RAG context from the deployment package's MCP server
+      let ragContext = '';
+      try {
+        ragContext = await this._fetchRagContext(options.userPrompt, runId, tokenSource.token);
+      } catch {
+        this._postActivity(runId, 'prompt', 'info', 'RAG context fetch skipped (tool unavailable)');
+      }
+
       // Combine the agent system prompt and the user request into a single,
       // well-framed user message. Sending the agent prompt as a separate User
       // message frequently triggers Copilot guardrail refusals on long, real-world
@@ -526,12 +670,15 @@ export class ReviewPanel {
         '# Role and Instructions',
         systemPrompt,
         '',
+        ragContext ? '# Codebase Context (from RAG index)' : '',
+        ragContext ? ragContext : '',
+        ragContext ? '' : '',
         '# User-Provided Context',
         'The user has explicitly authorized this content for analysis inside their own VS Code workspace. Treat any embedded files as the user\'s own materials.',
         '',
         '# User Request',
         composedPrompt,
-      ].join('\n');
+      ].filter(line => line !== '' || ragContext).join('\n');
 
       const messages: vscode.LanguageModelChatMessage[] = [
         vscode.LanguageModelChatMessage.User(framed),
@@ -1080,6 +1227,7 @@ export class ReviewPanel {
       workspace: '⬡',
       user:      '◉',
       claude:    '✦',
+      deployed:  '📦',
     };
 
     const nonce = Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
@@ -1199,6 +1347,36 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size
 .btn.warn{background:transparent;color:var(--warn);border:1px solid var(--warn)}
 .btn.warn:hover{background:var(--hover)}
 
+/* ── Services panel ── */
+.services-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+.services-header{padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.services-header:hover{background:var(--hover)}
+.services-header .toggle-arrow{font-size:10px;transition:transform .14s ease;color:var(--muted)}
+.services-header .toggle-arrow.open{transform:rotate(90deg)}
+.services-count{margin-left:auto;font-size:10px;font-weight:600;padding:2px 6px;border-radius:10px;background:transparent;border:1px solid var(--border);color:var(--muted)}
+.services-count.has-running{color:var(--success);border-color:var(--success)}
+.services-body{display:none;max-height:400px;overflow-y:auto}
+.services-body.open{display:block}
+.svc-category{padding:4px 12px 2px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);background:var(--surface2)}
+.svc-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)}
+.svc-item:last-child{border-bottom:none}
+.svc-item:hover{background:var(--hover)}
+.svc-icon{font-size:16px;flex-shrink:0;width:24px;text-align:center}
+.svc-info{flex:1;min-width:0}
+.svc-name{font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px}
+.svc-desc{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.svc-prereq{font-size:10px;color:var(--muted);font-style:italic;margin-top:1px}
+.svc-status{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.svc-status.stopped{background:var(--muted)}
+.svc-status.starting{background:var(--warn);animation:blink .7s step-end infinite}
+.svc-status.running{background:var(--success)}
+.svc-status.error{background:var(--danger)}
+.svc-actions{display:flex;gap:4px;flex-shrink:0}
+.svc-btn{padding:2px 8px;border-radius:2px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:var(--btn-secondary-bg);color:var(--btn-secondary-fg)}
+.svc-btn:hover{background:var(--btn-secondary-hover)}
+.svc-btn.start{color:var(--success);border-color:var(--success)}
+.svc-btn.stop{color:var(--danger);border-color:var(--danger)}
+
 /* ── Review card ── */
 .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px}
 .card-header{padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
@@ -1285,7 +1463,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size
 
 <!-- ── Body ── -->
 <div class="body">
-  <div class="source-note">Agent source: deployed workspace agents from .github/agents</div>
+  <div class="source-note">Agent source: workspace (.github/agents), deployment package, and user profile</div>
+
+  <!-- Services Panel -->
+  <div class="services-card">
+    <div class="services-header" id="services-header">
+      <span class="toggle-arrow" id="services-toggle-arrow">▸</span>
+      <span>⚙️ Services</span>
+      <span class="services-count" id="services-count">0 running</span>
+    </div>
+    <div class="services-body" id="services-body"></div>
+  </div>
 
   <div class="composer">
     <div class="composer-title">Agent Prompt</div>
@@ -1408,7 +1596,7 @@ let currentRunReport = null;
 function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 // ── Scope label helper ──
-function scopeLabel(s){return s==='workspace'?'Workspace':s==='user'?'User profile':'Claude';}
+function scopeLabel(s){return s==='workspace'?'Workspace':s==='user'?'User profile':s==='deployed'?'Deployment Package':'Claude';}
 
 // ── Dropdown ──────────────────────────────────────────────────────────────────
 function toggleDropdown(){
@@ -1497,6 +1685,82 @@ function resetTimelineGroups(){
 
 function formatUsd(value){
   return '$' + Number(value || 0).toFixed(4);
+}
+
+// ── Services panel ────────────────────────────────────────────────────────────
+let allServices = [];
+let servicesExpanded = false;
+
+function toggleServicesPanel(){
+  servicesExpanded = !servicesExpanded;
+  const body = document.getElementById('services-body');
+  const arrow = document.getElementById('services-toggle-arrow');
+  if (body) body.classList.toggle('open', servicesExpanded);
+  if (arrow) arrow.classList.toggle('open', servicesExpanded);
+}
+
+function renderServices(services){
+  allServices = services || [];
+  const body = document.getElementById('services-body');
+  if (!body) return;
+
+  const runningCount = allServices.filter(s => s.status === 'running' || s.status === 'starting').length;
+  const countEl = document.getElementById('services-count');
+  if (countEl) {
+    countEl.textContent = runningCount + ' running';
+    countEl.classList.toggle('has-running', runningCount > 0);
+  }
+
+  const categories = [
+    { key: 'core', label: 'Core Services' },
+    { key: 'rag', label: 'RAG / Embeddings' },
+    { key: 'analysis', label: 'Analysis Tools' },
+    { key: 'utility', label: 'Utilities' },
+  ];
+
+  let html = '';
+  for (const cat of categories) {
+    const items = allServices.filter(s => s.category === cat.key);
+    if (items.length === 0) continue;
+    html += '<div class="svc-category">' + escapeHtml(cat.label) + '</div>';
+    for (const svc of items) {
+      const isRunning = svc.status === 'running' || svc.status === 'starting';
+      html += '<div class="svc-item" data-svc-id="' + escapeHtml(svc.id) + '">';
+      html += '  <span class="svc-icon">' + svc.icon + '</span>';
+      html += '  <div class="svc-info">';
+      html += '    <div class="svc-name">';
+      html += '      <span class="svc-status ' + svc.status + '"></span>';
+      html += '      ' + escapeHtml(svc.name);
+      html += '    </div>';
+      html += '    <div class="svc-desc">' + escapeHtml(svc.description) + '</div>';
+      if (svc.prerequisites) {
+        html += '    <div class="svc-prereq">Requires: ' + escapeHtml(svc.prerequisites) + '</div>';
+      }
+      html += '  </div>';
+      html += '  <div class="svc-actions">';
+      if (isRunning && svc.longRunning) {
+        html += '    <button class="svc-btn stop" data-svc-action="stop" data-svc-id="' + escapeHtml(svc.id) + '">Stop</button>';
+        html += '    <button class="svc-btn" data-svc-action="restart" data-svc-id="' + escapeHtml(svc.id) + '">Restart</button>';
+      } else if (!isRunning) {
+        html += '    <button class="svc-btn start" data-svc-action="start" data-svc-id="' + escapeHtml(svc.id) + '">Start</button>';
+      } else {
+        html += '    <span style="font-size:11px;color:var(--warn)">Running…</span>';
+      }
+      html += '  </div>';
+      html += '</div>';
+    }
+  }
+  body.innerHTML = html;
+}
+
+function handleServiceAction(action, serviceId){
+  if (action === 'start') {
+    vscode.postMessage({ command: 'startService', serviceId: serviceId });
+  } else if (action === 'stop') {
+    vscode.postMessage({ command: 'stopService', serviceId: serviceId });
+  } else if (action === 'restart') {
+    vscode.postMessage({ command: 'restartService', serviceId: serviceId });
+  }
 }
 
 function updateUsageChip(usage){
@@ -1731,6 +1995,26 @@ document.addEventListener('click', (e) => {
     return;
   }
 
+  // Service action buttons
+  const svcBtn = target.closest('[data-svc-action]');
+  if (svcBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const action = svcBtn.getAttribute('data-svc-action') || '';
+    const svcId = svcBtn.getAttribute('data-svc-id') || '';
+    if (action && svcId) {
+      handleServiceAction(action, svcId);
+    }
+    return;
+  }
+
+  // Services panel header toggle
+  if (target.closest('#services-header')) {
+    e.preventDefault();
+    toggleServicesPanel();
+    return;
+  }
+
   const agentItem = target.closest('.agent-item[data-path]');
   if (agentItem) {
     e.preventDefault();
@@ -1932,6 +2216,9 @@ window.addEventListener('message', e => {
     case 'info':
       pushActivity('prompt', 'info', msg.text, new Date().toISOString());
       break;
+    case 'servicesUpdated':
+      renderServices(msg.services);
+      break;
   }
 });
 
@@ -1964,5 +2251,5 @@ function escapeJs(s: string): string {
   return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 }
 function scopeLabel(s: string): string {
-  return s === 'workspace' ? 'Workspace' : s === 'user' ? 'User profile' : 'Claude';
+  return s === 'workspace' ? 'Workspace' : s === 'user' ? 'User profile' : s === 'deployed' ? 'Deployment Package' : 'Claude';
 }

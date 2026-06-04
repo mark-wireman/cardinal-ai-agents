@@ -15,7 +15,10 @@
     "onStartupFinished",
     "onCommand:copilot-reviewer.selectAgent",
     "onCommand:copilot-reviewer.openPanel",
-    "onCommand:copilot-reviewer.reviewActiveFile"
+    "onCommand:copilot-reviewer.reviewActiveFile",
+    "onCommand:copilot-reviewer.startService",
+    "onCommand:copilot-reviewer.stopService",
+    "onCommand:copilot-reviewer.startAllServices"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -32,6 +35,21 @@
       {
         "command": "copilot-reviewer.reviewActiveFile",
         "title": "Local Agent Studio: Run Active File"
+      },
+      {
+        "command": "copilot-reviewer.startService",
+        "title": "Local Agent Studio: Start Service",
+        "icon": "$(play)"
+      },
+      {
+        "command": "copilot-reviewer.stopService",
+        "title": "Local Agent Studio: Stop Service",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "copilot-reviewer.startAllServices",
+        "title": "Local Agent Studio: Start All Core Services",
+        "icon": "$(run-all)"
       }
     ],
     "viewsContainers": {
@@ -55,7 +73,7 @@
     "viewsWelcome": [
       {
         "view": "copilot-reviewer.home",
-        "contents": "Run local Copilot agents from `.github/agents/`, `.claude/agents/`, or your user profile against the workspace.\n\n[Open Studio](command:copilot-reviewer.openPanel)\n[Select Agent](command:copilot-reviewer.selectAgent)\n[Run on Active File](command:copilot-reviewer.reviewActiveFile)"
+        "contents": "Run local Copilot agents from `.github/agents/`, `.claude/agents/`, the deployment package, or your user profile against the workspace.\n\n[Open Studio](command:copilot-reviewer.openPanel)\n[Select Agent](command:copilot-reviewer.selectAgent)\n[Run on Active File](command:copilot-reviewer.reviewActiveFile)\n[Start a Service](command:copilot-reviewer.startService)\n[Start All Core Services](command:copilot-reviewer.startAllServices)"
       }
     ],
     "menus": {
