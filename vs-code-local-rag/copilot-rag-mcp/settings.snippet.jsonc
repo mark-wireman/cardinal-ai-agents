@@ -1,0 +1,37 @@
+// ============================================================================
+// settings.json snippet  (Command Palette -> "Preferences: Open User Settings (JSON)")
+// ----------------------------------------------------------------------------
+// Use this user-level form if you want the RAG server available across all
+// workspaces. In user settings, the server map lives UNDER an "mcp" key.
+// If you instead use .vscode/mcp.json, the same block sits at the top level.
+// ============================================================================
+{
+  "mcp": {
+    "inputs": [],
+    "servers": {
+      "codebase-rag": {
+        "type": "stdio",
+        "command": "node",
+        "args": ["/absolute/path/to/copilot-rag-mcp/dist/server.js"],
+        "env": {
+          "REPO_ROOT": "${workspaceFolder}",
+          "OLLAMA_BASE_URL": "http://localhost:11434",
+          "EMBED_MODEL": "nomic-embed-text",
+          "CHROMA_URL": "http://localhost:8000",
+          "COLLECTION": "codebase",
+          "DEFAULT_TOP_K": "8",
+          "DEFAULT_TOKEN_BUDGET": "2200"
+        }
+      }
+    }
+  },
+
+  // ---- Recommended cost-control settings for Copilot itself ----
+
+  // Make VS Code pick up .github/copilot-instructions.md automatically.
+  "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+
+  // Don't auto-attach the current selection/file as context on every request;
+  // let the RAG tools decide what's relevant. (Attach explicitly when needed.)
+  "github.copilot.chat.experimental.codesearch.enabled": true
+}

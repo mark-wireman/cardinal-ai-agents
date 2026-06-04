@@ -1,0 +1,25 @@
+# Files here are skipped by the indexer (in addition to .gitignore).
+# Keeping noise out of the index improves retrieval quality AND lowers tokens,
+# since irrelevant chunks can't be pulled into context.
+
+# Generated / vendored
+dist/
+build/
+out/
+coverage/
+node_modules/
+vendor/
+**/__generated__/**
+
+# Large data and fixtures
+**/*.snap
+**/fixtures/**
+**/*.csv
+**/*.parquet
+
+# Secrets and local env (never index these)
+.env
+.env.*
+**/secrets/**
+**/*.pem
+**/*.key

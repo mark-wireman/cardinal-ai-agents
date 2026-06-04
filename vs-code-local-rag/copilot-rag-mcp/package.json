@@ -1,0 +1,33 @@
+{
+  "name": "copilot-rag-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local RAG MCP server (Ollama + ChromaDB) that gives GitHub Copilot agent mode token-efficient semantic retrieval over your codebase.",
+  "type": "module",
+  "bin": {
+    "copilot-rag-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "index": "tsx src/index-cli.ts",
+    "reindex": "tsx src/index-cli.ts --force",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "chromadb": "^1.9.0",
+    "dotenv": "^16.4.5",
+    "fast-glob": "^3.3.2",
+    "ignore": "^5.3.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.17"
+  }
+}
