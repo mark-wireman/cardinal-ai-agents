@@ -1,6 +1,6 @@
 ## Gemini Agents & MCP Server Deployment Strategy for nuclear-isotrac* Repositories
 
-This strategy enables a team of developers and project managers to use the Gemini-powered agents (user story, code review, frontend/backend code generation, Katalon test generator) across all nuclear-isotrac* repositories.
+This strategy enables a team of developers and project managers to use the Gemini-powered agents (user story, code review, frontend/backend code generation, Katalon test generator) across all code repositories.
 
 ### Prerequisites
 - **Node.js runtime**: Node.js v18+ and npm
@@ -89,7 +89,7 @@ Notes:
 - If using VS Code or similar tools, configure the workspace to include the central `context/` folder (e.g., as a workspace folder or via symlink) so agents and users can access it seamlessly.
 
 ### 3. Repository Integration
-- For each `nuclear-isotrac*` repository:
+- For each `code` repository:
   - Add the `.github/agents/` directory (or reference the central one).
   - Document in the repository README how to invoke the agents (e.g., via VS Code extension, CLI, or web UI).
   - Optionally, provide scripts or tasks for common agent actions (e.g., generate user story, review code, scaffold backend).
@@ -116,4 +116,4 @@ Notes:
 
 ---
 **Summary:**
-Centralize the MCP server and agent configs, secure credentials, and provide clear documentation for team access. Integrate agent workflows into each nuclear-isotrac* repository for seamless, AI-powered development and project management.
+Centralize the MCP server and agent configs, secure credentials, and provide clear documentation for team access. Integrate agent workflows into each code* repository for seamless, AI-powered development and project management.
