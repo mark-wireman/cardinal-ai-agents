@@ -153,6 +153,15 @@ Before deploying or running components in this repository, ensure the following 
 ---
 
 ## Getting Started
+### IntelliJ one-click deployment
+
+1. Open this repository in IntelliJ.
+2. Run `01 - One Click Deploy (IntelliJ)` from the Run menu (shared config in `.run/`).
+3. Run `02 - Start Core Services`.
+4. Run `04 - Build RAG Index`.
+
+Detailed IntelliJ guide: [INTELLIJ_QUICKSTART.md](INTELLIJ_QUICKSTART.md)
+
 1. **Install Node dependencies**: Run `npm install` to set up Node.js dependencies.
 2. **Build the deep_rl_agent binary** (for multi-agent code generation):
    ```bash

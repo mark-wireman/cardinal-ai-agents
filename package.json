@@ -13,6 +13,7 @@
   },
   "scripts": {
     "start": "node mcp-server.js",
+    "deploy:intellij": "powershell -ExecutionPolicy Bypass -File ./deploy-intellij.ps1",
     "build-deep-rl": "cd deep-rl-cpp-master/build && cmake .. -DCMAKE_BUILD_TYPE=Release && make"
   },
   "bin": {

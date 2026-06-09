@@ -1,5 +1,22 @@
 ﻿# Quick Start: Agents Deployment Package
 
+## IntelliJ 1-Click Deploy
+
+Use the IntelliJ package files committed in this repository:
+
+```powershell
+# From IntelliJ terminal (or PowerShell at repo root)
+.\deploy-intellij.ps1
+```
+
+Or use shared IntelliJ Run Configurations in `.run/`:
+
+1. `01 - One Click Deploy (IntelliJ)`
+2. `02 - Start Core Services`
+3. `04 - Build RAG Index`
+
+For full details, see [INTELLIJ_QUICKSTART.md](INTELLIJ_QUICKSTART.md).
+
 ## 1-Click Deploy (Recommended)
 
 ```powershell
