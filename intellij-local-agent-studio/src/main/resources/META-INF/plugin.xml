@@ -1,0 +1,21 @@
+<idea-plugin>
+    <id>com.cardinalhealth.localagentstudio.intellij</id>
+    <name>Local Agent Studio</name>
+    <vendor email="devnull@cardinalhealth.com">Cardinal Health</vendor>
+
+    <description><![CDATA[
+        IntelliJ-native control surface for agents-deployment-package.
+        Start core services, build RAG index, and run one-click deployment from a Tool Window.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow
+            id="Local Agent Studio"
+            anchor="right"
+            icon="/icons/agentStudio.svg"
+            factoryClass="com.cardinalhealth.localagentstudio.LocalAgentStudioToolWindowFactory"
+            canCloseContents="false" />
+    </extensions>
+</idea-plugin>

@@ -92,7 +92,8 @@ async function getApigeeToken() {
         'X-API-Secret': process.env.APIGEE_SECRET
       },
       body: JSON.stringify({
-        grant_type: 'client_credentials'
+        grant_type: 'client_credentials',
+        project: process.env.APIGEE_PROJECT
       })
     });
  

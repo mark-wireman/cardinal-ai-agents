@@ -8,6 +8,37 @@ This guide provides an IntelliJ-native deployment path for the agents-deployment
 - IntelliJ shared run configurations in .run/
 - Service launcher scripts in scripts/intellij/
 - RAG index builder script that always indexes the workspace root
+- IntelliJ plugin module: intellij-local-agent-studio/ (Tool Window UI)
+
+## IntelliJ-native Tool Window UI
+
+This repository now includes a true IntelliJ plugin module at intellij-local-agent-studio/.
+
+It provides a Local Agent Studio Tool Window with native UI buttons for:
+
+- One Click Deploy
+- Start Core Services
+- Build RAG Index
+- Start Core + Index
+
+### Run the plugin in a sandbox IDE
+
+1. Open intellij-local-agent-studio/ as a Gradle project in IntelliJ.
+2. Run the Gradle task runIde.
+3. In the sandbox IDE, open this repository root.
+4. Open the Local Agent Studio Tool Window.
+
+### Build and install plugin ZIP
+
+From intellij-local-agent-studio/:
+
+```powershell
+.\gradlew.bat buildPlugin
+```
+
+Then install the ZIP from intellij-local-agent-studio/build/distributions/ via:
+
+- Settings -> Plugins -> Gear icon -> Install Plugin from Disk
 
 ## Prerequisites
 
@@ -32,6 +63,7 @@ After deployment, run one of these from the IntelliJ Run menu:
 
 - 02 - Start Core Services
 - 03 - Start All Services
+- 05 - Start Core Services + Build Index
 
 Core profile starts:
 
@@ -47,6 +79,8 @@ All profile adds:
 ## Build the RAG index from IntelliJ
 
 Run: 04 - Build RAG Index
+
+If you want a single action, run: 05 - Start Core Services + Build Index
 
 This script sets:
 
@@ -65,6 +99,39 @@ Run from IntelliJ Terminal:
 .\scripts\intellij\start-services.ps1 -ServiceProfile core
 .\scripts\intellij\build-rag-index.ps1
 ```
+
+## If Run Configurations are missing in IntelliJ
+
+1. Confirm [agents-deployment-package/.run](.run) exists in the project root.
+2. In IntelliJ, use File -> Open and select the repository root (not a subfolder).
+3. Open Run -> Edit Configurations and check for the imported shared configs.
+4. If still missing, click Add New Configuration -> Shell Script and use:
+	- Script text: `powershell -ExecutionPolicy Bypass -File "$PROJECT_DIR$/scripts/intellij/start-core-and-index.ps1"`
+5. Run that config and keep the service windows open while using MCP tools.
+
+## If index build fails with fetch failed
+
+- This usually means Ollama or ChromaDB is not ready yet.
+- Use `05 - Start Core Services + Build Index` (it waits for readiness).
+- Or rerun `04 - Build RAG Index` after waiting 15-30 seconds.
+
+## If Start Core Services reports "Ollama not found in PATH"
+
+1. Install Ollama from <https://ollama.com/download>.
+2. Close and reopen IntelliJ so it picks up updated PATH.
+3. In IntelliJ terminal, verify:
+
+```powershell
+ollama --version
+```
+
+4. Pull embedding model once:
+
+```powershell
+ollama pull nomic-embed-text
+```
+
+5. Run `05 - Start Core Services + Build Index` again.
 
 ## Notes
 

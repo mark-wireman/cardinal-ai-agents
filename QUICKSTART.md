@@ -17,6 +17,8 @@ Or use shared IntelliJ Run Configurations in `.run/`:
 
 For full details, see [INTELLIJ_QUICKSTART.md](INTELLIJ_QUICKSTART.md).
 
+For a true IntelliJ-native UI, use the plugin module in `intellij-local-agent-studio/` and run Gradle task `runIde`.
+
 ## 1-Click Deploy (Recommended)
 
 ```powershell

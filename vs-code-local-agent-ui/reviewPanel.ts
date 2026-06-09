@@ -342,7 +342,7 @@ export class ReviewPanel {
       if (!vscode.lm || typeof vscode.lm.invokeTool !== 'function') {
         return null;
       }
-      const result = await vscode.lm.invokeTool(toolName, { input }, token);
+      const result = await vscode.lm.invokeTool(toolName, { input, toolInvocationToken: undefined }, token);
       // The result is a LanguageModelToolResult with content parts
       if (result && typeof result === 'object' && 'content' in result) {
         const parts = (result as { content: Array<{ type: string; value?: string }> }).content;

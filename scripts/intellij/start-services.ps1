@@ -23,6 +23,20 @@ $ErrorActionPreference = 'Stop'
 
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 
+function Test-CommandAvailable {
+    param(
+        [Parameter(Mandatory = $true)][string]$CommandName,
+        [Parameter(Mandatory = $true)][string]$DisplayName
+    )
+
+    if (-not (Get-Command $CommandName -ErrorAction SilentlyContinue)) {
+        Write-Host "[FAIL] $DisplayName not found in PATH. Install it or add it to PATH, then rerun." -ForegroundColor Red
+        return $false
+    }
+    Write-Host "[OK] $DisplayName found" -ForegroundColor Green
+    return $true
+}
+
 function Start-ServiceWindow {
     param(
         [Parameter(Mandatory = $true)][string]$Title,
@@ -43,8 +57,20 @@ Write-Host ''
 Write-Host "Starting service profile: $ServiceProfile" -ForegroundColor Cyan
 Write-Host ''
 
+# Preflight checks
+$ok = $true
+$ok = (Test-CommandAvailable -CommandName 'node' -DisplayName 'Node.js') -and $ok
+$ok = (Test-CommandAvailable -CommandName 'chroma' -DisplayName 'ChromaDB CLI') -and $ok
+
+if (-not $ok) {
+    Write-Host ''
+    Write-Host 'One or more required commands are missing. Core services were not started.' -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host ''
+
 # Core services required for MCP + RAG
-Start-ServiceWindow -Title 'Ollama' -WorkingDirectory '.' -Command 'ollama serve'
 Start-ServiceWindow -Title 'ChromaDB' -WorkingDirectory '.' -Command 'chroma run --path ./chroma_data --port 8000'
 Start-ServiceWindow -Title 'MCP Server' -WorkingDirectory '.' -Command 'node mcp-server.js'
 

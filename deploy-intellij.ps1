@@ -38,17 +38,16 @@ Write-Host '============================================================' -Foreg
 Write-Host ''
 
 
-$deployParameters = @()
-if ($SkipPython) { $deployParameters += '-SkipPython' }
-if ($SkipDeepRL) { $deployParameters += '-SkipDeepRL' }
-if (-not $InstallVsCodeExtension) { $deployParameters += '-SkipExtension' }
-if ($Force) { $deployParameters += '-Force' }
+# Pass switches by name (not as positional strings)
+$deployParameters = @{
+    SkipExtension = (-not $InstallVsCodeExtension)
+}
+
+if ($SkipPython) { $deployParameters.SkipPython = $true }
+if ($SkipDeepRL) { $deployParameters.SkipDeepRL = $true }
+if ($Force) { $deployParameters.Force = $true }
 
 & $deployScript @deployParameters
-
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}
 
 Write-Host ''
 Write-Host 'IntelliJ next steps:' -ForegroundColor Green
