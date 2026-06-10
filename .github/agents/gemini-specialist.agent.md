@@ -1,7 +1,7 @@
 ---
 name: gemini-specialist
 description: AI assistant powered by Gemini through secure Apigee gateway
-tools: ['gemini-apigee-server/ask_gemini', 'execute', 'read', 'edit', 'search', 'todo', 'copilot/ask_copilot', 'read_file', 'write_file', 'edit_file', 'list_files', 'delete_file', 'edit/createDirectory', 'edit/createFile', 'agent', 'agent/runSubagent', 'web/search', 'web/scrape']
+tools: ['gemini-apigee-server/ask_gemini', 'execute', 'read', 'edit', 'search', 'todo', 'read_file', 'write_file', 'edit_file', 'list_files', 'delete_file', 'edit/createDirectory', 'edit/createFile', 'web/search', 'web/scrape']
 mcp-servers:
   gemini-apigee-server:
     type: 'local'

@@ -12,50 +12,10 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
 import dotenv from 'dotenv';
+import axios from 'axios';
 
 // Load environment variables
 dotenv.config();
-
-// --- RAG imports (compiled from copilot-rag-mcp) ---
-import { config as ragConfig, approxTokens } from './vs-code-local-rag/copilot-rag-mcp/dist/config.js';
-import { embedOne } from './vs-code-local-rag/copilot-rag-mcp/dist/embeddings.js';
-import { VectorStore } from './vs-code-local-rag/copilot-rag-mcp/dist/vectorstore.js';
-import { indexRepo } from './vs-code-local-rag/copilot-rag-mcp/dist/indexer.js';
-
-// RAG vector store singleton
-const ragStore = new VectorStore();
-
-function fence(lang) {
-  return lang && lang !== 'text' ? lang : '';
-}
-
-function renderHit(hit) {
-  const p = hit.payload;
-  const header = `${p.path}:${p.startLine}-${p.endLine}${p.symbol ? ` (${p.symbol})` : ''}  [score ${hit.score.toFixed(3)}]`;
-  return `### ${header}\n\`\`\`${fence(p.language)}\n${p.text}\n\`\`\``;
-}
-
-function dedupeHits(hits) {
-  const kept = [];
-  for (const h of hits) {
-    const overlap = kept.find(
-      (k) =>
-        k.payload.path === h.payload.path &&
-        h.payload.startLine <= k.payload.endLine &&
-        h.payload.endLine >= k.payload.startLine,
-    );
-    if (!overlap) kept.push(h);
-  }
-  return kept;
-}
-
-// Check if RAG dependencies (Ollama, ChromaDB) are configured
-const ragAvailable = Boolean(ragConfig.ollamaBaseUrl && ragConfig.chromaUrl);
-if (ragAvailable) {
-  console.error(`RAG tools enabled. repo=${ragConfig.repoRoot} collection=${ragConfig.collection}`);
-} else {
-  console.error('Warning: RAG tools disabled. Set OLLAMA_BASE_URL and CHROMA_URL env vars.');
-}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -79,34 +39,96 @@ let tokenCache = {
  
 // Apigee authentication
 async function getApigeeToken() {
-  if (tokenCache.token && tokenCache.expiresAt > Date.now()) {
-    return tokenCache.token;
+  const TOKEN_CACHE = {
+    token: null,
+    expiresAt: null,
+  };
+
+  if (TOKEN_CACHE.token && TOKEN_CACHE.expiresAt && TOKEN_CACHE.expiresAt > Date.now() / 1000) {
+    return TOKEN_CACHE.token;
   }
- 
+
+  const endpoint = process.env.APIGEE_ENDPOINT;
+  const apiKey = process.env.APIGEE_KEY;
+  const apiSecret = process.env.APIGEE_SECRET;
+  const fallbackToken = process.env.APIGEE_ACCESS_TOKEN;
+  
+
+  function ensureGrantType(url) {
+    const parsed = new URL(url);
+    if (!parsed.searchParams.has('grant_type')) {
+      parsed.searchParams.set('grant_type', 'client_credentials');
+    }
+    return parsed.toString();
+  }
+
+  if (!endpoint || !endpoint.trim()) throw new Error('Missing required environment variable: APIGEE_ENDPOINT');
+  if (!apiKey || !apiKey.trim()) throw new Error('Missing required environment variable: APIGEE_KEY');
+  if (!apiSecret || !apiSecret.trim()) throw new Error('Missing required environment variable: APIGEE_SECRET');
+
+  const endpointWithGrant = ensureGrantType(endpoint);
+
+  const fallbackAttempts = [
+    {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-API-Key': apiKey, 'X-API-Secret': apiSecret },
+      data: new URLSearchParams({ grant_type: 'client_credentials' }),
+      auth: null,
+    },
+    {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      data: new URLSearchParams({ grant_type: 'client_credentials', client_id: apiKey, client_secret: apiSecret }),
+      auth: null,
+    },
+    {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      data: new URLSearchParams({ grant_type: 'client_credentials' }),
+      auth: { username: apiKey, password: apiSecret },
+    },
+  ];
+
   try {
-    const response = await fetch(process.env.APIGEE_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': process.env.APIGEE_KEY,
-        'X-API-Secret': process.env.APIGEE_SECRET
-      },
-      body: JSON.stringify({
-        grant_type: 'client_credentials',
-        project: process.env.APIGEE_PROJECT
-      })
-    });
- 
-    const data = await response.json();
-    const expiresIn = data.expires_in || 3600;
-    
-    tokenCache = {
-      token: data.access_token,
-      expiresAt: Date.now() + (expiresIn - 300) * 1000
-    };
- 
-    return tokenCache.token;
+    let response = await axios.post(
+      endpointWithGrant,
+      { grant_type: 'client_credentials' },
+      {
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey, 'X-API-Secret': apiSecret },
+        timeout: 60000,
+        validateStatus: null,
+      }
+    );
+
+    if (!response.status || response.status >= 400) {
+      for (const attempt of fallbackAttempts) {
+        response = await axios.post(endpointWithGrant, attempt.data, {
+          headers: attempt.headers,
+          auth: attempt.auth ?? undefined,
+          timeout: 60000,
+          validateStatus: null,
+        });
+        if (response.status < 400) break;
+      }
+    }
+
+    if (response.status >= 400) {
+      throw new Error(`HTTP ${response.status}: ${JSON.stringify(response.data)}`);
+    }
+
+    const data = response.data;
+    const expiresIn = parseInt(data.expires_in ?? '3600', 10);
+    const token = data.access_token;
+
+    if (!token || !token.trim()) throw new Error('Apigee token response missing access_token');
+
+    TOKEN_CACHE.token = token.trim();
+    TOKEN_CACHE.expiresAt = Date.now() / 1000 + Math.max(expiresIn - 300, 60);
+    return TOKEN_CACHE.token;
+
   } catch (error) {
+    if (fallbackToken && fallbackToken.trim()) {
+      TOKEN_CACHE.token = fallbackToken.trim();
+      TOKEN_CACHE.expiresAt = Date.now() / 1000 + 300;
+      return TOKEN_CACHE.token;
+    }
     throw new Error(`Apigee auth failed: ${error.message}`);
   }
 }
@@ -114,27 +136,66 @@ async function getApigeeToken() {
 // Call Gemini with prompt
 async function callGemini(prompt) {
   const token = await getApigeeToken();
- 
+  const endpoint = process.env.GEMINI_ENDPOINT;
+  const apiKey = process.env.APIGEE_KEY;
+  const providerProject = process.env.GEMINI_PROVIDER_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
+
+  if (!endpoint || !endpoint.trim()) throw new Error('Missing required environment variable: GEMINI_ENDPOINT');
+
+  const hasText = (value) => typeof value === 'string' && value.trim() !== '';
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  };
+
+  if (hasText(apiKey)) {
+    headers['X-API-Key'] = apiKey.trim();
+  }
+  if (hasText(providerProject)) {
+    headers['x-goog-user-project'] = providerProject.trim();
+  }
+
   try {
-    const response = await fetch(process.env.GEMINI_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+    const response = await axios.post(
+      endpoint,
+      {
+        systemInstruction: {
+          parts: [{ text: 'You are a helpful assistant for software development tasks.' }],
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }],
+          },
+        ],
       },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }]
-      })
-    });
- 
-    const data = await response.json();
+      {
+        headers,
+        timeout: 120000,
+        validateStatus: null,
+      }
+    );
+
+    if (response.status >= 400) {
+      throw new Error(`HTTP ${response.status}: ${JSON.stringify(response.data)}`);
+    }
+
+    const data = response.data;
     return data.candidates[0].content.parts[0].text;
   } catch (error) {
-    throw new Error(`Gemini call failed: ${error.message}`);
+    let details = '';
+    if (error.response) {
+      const preview = (error.response.data?.toString?.() || error.response.text || '')
+        .trim()
+        .replace(/\n/g, ' ')
+        .substring(0, 400);
+      details = ` HTTP ${error.response.status}. Response: ${preview || '<empty>'}`;
+    }
+    throw new Error(`Gemini call failed: ${error.message}.${details}`);
   }
 }
+
  
 // Create MCP server
 const server = new Server(
@@ -505,82 +566,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       inputSchema: deepRLSchema
     });
   }
-
-  // RAG tools (semantic codebase search via Ollama + ChromaDB)
-  if (ragAvailable) {
-    tools.push({
-      name: 'search_code',
-      description:
-        'Semantic search over the indexed codebase. Returns the top matching code ' +
-        'chunks with file path and line range. Use this to locate relevant code ' +
-        'instead of reading or grepping whole files.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'Natural-language or code description of what to find.'
-          },
-          k: {
-            type: 'integer',
-            minimum: 1,
-            maximum: 30,
-            description: `Number of chunks to return (default ${ragConfig.defaultTopK}).`
-          }
-        },
-        required: ['query']
-      }
-    });
-
-    tools.push({
-      name: 'get_context',
-      description:
-        'Returns the most relevant code for a task, packed to stay under a token ' +
-        'budget. This is the preferred way to gather grounding context before ' +
-        'answering or editing, because it minimizes tokens sent to the model.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'What you are about to work on.'
-          },
-          token_budget: {
-            type: 'integer',
-            minimum: 200,
-            maximum: 16000,
-            description: `Hard ceiling on returned tokens (default ${ragConfig.defaultTokenBudget}).`
-          }
-        },
-        required: ['query']
-      }
-    });
-
-    tools.push({
-      name: 'list_indexed_files',
-      description: 'Summarises what is currently indexed: distinct files and total chunk count.',
-      inputSchema: {
-        type: 'object',
-        properties: {}
-      }
-    });
-
-    tools.push({
-      name: 'reindex',
-      description:
-        'Incrementally re-embed changed files into the vector store. Pass force=true ' +
-        'to rebuild everything (e.g. after changing the embedding model).',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          force: {
-            type: 'boolean',
-            description: 'Rebuild the entire index from scratch.'
-          }
-        }
-      }
-    });
-  }
   
   return { tools };
 });
@@ -662,85 +647,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   }
  
-  // --- RAG tool handlers ---
-  if (request.params.name === 'search_code') {
-    if (!ragAvailable) {
-      return { content: [{ type: 'text', text: 'Error: RAG tools are disabled. Set OLLAMA_BASE_URL and CHROMA_URL.' }], isError: true };
-    }
-    try {
-      const { query, k } = request.params.arguments;
-      const limit = k ?? ragConfig.defaultTopK;
-      const vector = await embedOne(query);
-      const hits = await ragStore.search(vector, limit);
-      if (hits.length === 0) {
-        return { content: [{ type: 'text', text: 'No matches. The index may be empty — run reindex.' }] };
-      }
-      const body = hits.map(renderHit).join('\n\n');
-      return { content: [{ type: 'text', text: body }] };
-    } catch (error) {
-      return { content: [{ type: 'text', text: `Error: ${error.message}` }], isError: true };
-    }
-  }
-
-  if (request.params.name === 'get_context') {
-    if (!ragAvailable) {
-      return { content: [{ type: 'text', text: 'Error: RAG tools are disabled. Set OLLAMA_BASE_URL and CHROMA_URL.' }], isError: true };
-    }
-    try {
-      const { query, token_budget } = request.params.arguments;
-      const budget = token_budget ?? ragConfig.defaultTokenBudget;
-      const vector = await embedOne(query);
-      const raw = await ragStore.search(vector, Math.max(ragConfig.defaultTopK * 3, 18));
-      const hits = dedupeHits(raw);
-
-      const blocks = [];
-      let used = 0;
-      for (const h of hits) {
-        const block = renderHit(h);
-        const cost = approxTokens(block);
-        if (used + cost > budget) continue;
-        blocks.push(block);
-        used += cost;
-      }
-
-      if (blocks.length === 0) {
-        return { content: [{ type: 'text', text: 'No context fit the budget. Raise token_budget or run reindex.' }] };
-      }
-
-      const text = `Context for: ${query}\n(${blocks.length} chunks, ~${used} tokens, budget ${budget})\n\n` + blocks.join('\n\n');
-      return { content: [{ type: 'text', text }] };
-    } catch (error) {
-      return { content: [{ type: 'text', text: `Error: ${error.message}` }], isError: true };
-    }
-  }
-
-  if (request.params.name === 'list_indexed_files') {
-    if (!ragAvailable) {
-      return { content: [{ type: 'text', text: 'Error: RAG tools are disabled. Set OLLAMA_BASE_URL and CHROMA_URL.' }], isError: true };
-    }
-    try {
-      const { files, chunkCount } = await ragStore.stats();
-      const preview = files.slice(0, 200).join('\n');
-      const more = files.length > 200 ? `\n...and ${files.length - 200} more` : '';
-      return { content: [{ type: 'text', text: `${files.length} files, ${chunkCount} chunks indexed.\n\n${preview}${more}` }] };
-    } catch (error) {
-      return { content: [{ type: 'text', text: `Error: ${error.message}` }], isError: true };
-    }
-  }
-
-  if (request.params.name === 'reindex') {
-    if (!ragAvailable) {
-      return { content: [{ type: 'text', text: 'Error: RAG tools are disabled. Set OLLAMA_BASE_URL and CHROMA_URL.' }], isError: true };
-    }
-    try {
-      const force = request.params.arguments?.force ?? false;
-      const r = await indexRepo(force);
-      return { content: [{ type: 'text', text: `Reindex complete. embedded=${r.indexedFiles} unchanged=${r.skippedFiles} removed=${r.removedFiles} chunks=${r.totalChunks}` }] };
-    } catch (error) {
-      return { content: [{ type: 'text', text: `Error: ${error.message}` }], isError: true };
-    }
-  }
-
   throw new Error(`Unknown tool: ${request.params.name}`);
 });
  

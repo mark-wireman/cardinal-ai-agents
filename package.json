@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.5.0",
+    "axios": "^1.17.0",
     "chromadb": "^1.9.0",
     "dotenv": "^16.0.3",
     "fast-glob": "^3.3.2",
@@ -17,6 +18,19 @@
     "build-deep-rl": "cd deep-rl-cpp-master/build && cmake .. -DCMAKE_BUILD_TYPE=Release && make"
   },
   "bin": {
-    "gemini-apigee-mcp": "./mcp-server.js"
-  }
+    "gemini-apigee-mcp": "mcp-server.js"
+  },
+  "description": "This repository contains resources, scripts, and documentation for deploying and managing AI agents, with a focus on agent architecture, deployment flows, and supporting data/configuration files. The package is designed to facilitate the deployment and operation of agents in a modular and scalable manner.",
+  "main": "mcp-server.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mark-wireman/local-ai-agents.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mark-wireman/local-ai-agents/issues"
+  },
+  "homepage": "https://github.com/mark-wireman/local-ai-agents#readme"
 }
